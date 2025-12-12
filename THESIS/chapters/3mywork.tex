@@ -1,0 +1,629 @@
+\chapter{Developed Workflow}
+\label{chap:mywork}
+After introducing the theoretical framework and the relevant computational methods, we will now focus on how these tools were applied in this thesis. The aim is to present an overview of the step-by-step process that supports the examination of thermal conductivity in various gold systems, outlining the workflow and methodology employed in both molecular dynamics simulations conducted with LAMMPS and the subsequent analysis carried out in Python. 
+
+This will be followed by the analysis of the results produced by post-processing, paying particular attention to how the calculation of thermal conductivity is influenced by the different degrees of porosity of the systems, and how much these depart from the equilibrium molecular dynamics hypotheses (stated in section \ref{subsec:EMD}). 
+
+
+\section{Introducing a workflow}
+This section outlines the workflow (see Figure \ref{fig:workflow}) adopted throughout this study, from the construction of the atomic systems in ASE to the MD simulations carried out in LAMMPS, and the calculation of thermal conductivity, performed in Python. The goal is to provide a clear overview of how the different computational tools were integrated and how each step contributes to the overall analysis.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.83\linewidth]{photos/workflow.png}
+    \caption{Overview of the workflow used in this study, including atomic system preparation, molecular dynamics simulations in LAMMPS, and post-processing for the evaluation of thermal conductivity.}
+    \label{fig:workflow}
+\end{figure}
+
+\subsection{Building the systems}
+The initial atomic structures examined in this research were generated using the Atomic Simulation Environment (ASE) \cite{ase}. The exact procedures used to construct the different atomic systems will be described in detail in the following section, when each system is analysed individually. \bigskip
+
+ASE is an open-source Python library designed to facilitate the creation and analysis of atomistic models, as well as to interface with a wide range of simulation codes, including LAMMPS and OVITO, the latter being a graphical tool for visualising, analysing, and post-processing atomistic simulation data \cite{ovito}. Its modular structure and scripting flexibility make it particularly suitable for constructing custom systems.\bigskip 
+
+The first part of the work focuses on several crystalline gold systems with a face-centred cubic (FCC) structure. All systems were constructed by applying periodic boundary conditions (PBC) in all directions, simulating an extended solid. Defects were then introduced into the bulk FCC gold structure, ensuring that local perturbations remained well-contained within the simulation cell and did not interact strongly with their periodic images. This approach allows the study of defect effects while keeping bulk Au as the reference system for all results.\bigskip 
+
+So, starting from the basic bulk structure,  introduced three different types of defects or porosity, while keeping fixed the size of the system:
+\begin{itemize}
+    \item \textbf{Vacancies:} atoms were randomly removed from the system to simulate the presence of atomic vacancies distributed throughout the material.
+    
+    \item \textbf{Holes:} one or more spherical holes were introduced in the simulation cell, removing a specific fraction of atoms to create local porosity.
+
+    \item \textbf{Void:} a hollow sphere was carved in the centre of the cell, simulating a larger open void within the bulk structure.
+\end{itemize}
+
+\bigskip
+In addition to these defected bulk structures, we used ASE to generated another class of systems, referred to as \textbf{nanopillars}, which are constructed as columns of atoms extracted from a bulk FCC gold lattice. Their specific construction procedures and structural characteristics will be described in detail in their dedicated section later in this chapter (Section \ref{subsec:nanop}).
+
+
+\subsection{Simulations in LAMMPS}
+All MD simulations were performed in LAMMPS, following a standardised three-step procedure. The simulations were carried out in the metal unit system, with a timestep of $1$ fs (standard for metals), using periodic boundary conditions in all directions, and to describe the interatomic interactions was used the Embedded Atom Method (EAM) potential, implemented in LAMMPS, originally developed by Foiles et al. for FCC metals \cite{Foiles1986}.\bigskip
+
+Each simulation started by assigning Maxwell–Boltzmann velocities corresponding to 300 K to all atoms, with the total linear and angular momenta removed to ensure a well-defined initial state.\bigskip
+
+In the first stage, the system underwent a canonical NVT equilibration at 300 K using a Nosé–Hoover thermostat with a gentle relaxation time of $0.5$ ps. This step allowed the system to reach thermal equilibrium, stabilizing temperature and atomic velocities.
+
+For this step and the following one, a total of $10^6$ ($\approx 1$ ns) simulation steps was employed to ensure adequate sampling and equilibration. Although this may appear excessive, such long runs were deliberately chosen to ensure that the system reached complete thermal and energetic equilibrium before data collection. Throughout the simulation, thermodynamic quantities such as temperature, kinetic and potential energy, total energy, and pressure were monitored over time to monitor the evolution of the system.\bigskip
+
+In the second stage, the thermostat was removed, and the simulation was continued in the microcanonical NVE ensemble for an additional $10^6$ time steps. This short equilibration under constant energy conditions ensured that no residual effects from the thermostat remained and that the total energy of the system was properly conserved. The temperature and energy were again recorded to confirm the dynamical stability of the equilibrated configuration.\bigskip
+
+Finally, in the third and last stage, the equilibrated structure was used as the starting point for the production run, performed in the NVE ensemble for $10^8$ time steps (corresponding to 100 ns of simulation time). During this phase, the atomic kinetic and potential energies, virial stress tensor, and heat flux vector components $J_x$, $J_y$, $J_z$ were computed using the \texttt{compute heat/flux} command in LAMMPS. These data were written to output files and then used to evaluate the thermal conductivity via the Green–Kubo formula.\bigskip
+
+Throughout all stages, additional output files containing atomic positions, velocities, and thermodynamic observables were generated to monitor the evolution of the system and to verify equilibrium conditions before the Green–Kubo analysis. These files were then visualised and analysed using OVITO to inspect structural evolution, defect distribution, and dynamic behaviour of the atoms.
+
+  
+
+\subsection{Post Processing in Python}
+When the simulation ends, we obtain multiple files, with three being the most significant, containing the temporal evolution of the thermodynamic properties. These files illustrate how the system evolves over time during the three phases outlined earlier. Once the files are downloaded, the third and last stage of the analysis can begin: the post-processing in Python. In this section, to compute thermal conductivity starting from raw simulation data, the procedure proposed by Chen et al. in \textit{How to Improve The Accuracy of Equilibrium Molecular Dynamics For Computation of Thermal Conductivity} \cite{Chen2013ImproveAccuracyEMD} was followed, with some modifications introduced to adapt it to the system and data format.\bigskip
+
+
+The first step of the post-processing was to verify that the system had reached equilibrium. This task was performed by the \texttt{plot\_data} function. To this end, the time evolution of the main thermodynamic quantities was plotted (see Figure \ref{fig:therm}), and in the final segment of the simulation (the production NVE phase), a linear regression was performed on the instantaneous values of $T$, $PE$, and $P$. This approach allowed detection of any residual drift in the observables, ensuring that the system was properly equilibrated before proceeding with further analyses.
+
+From the angular coefficient (slope) of the regression line, the total drift is obtained:
+\begin{equation}
+    \text{total drift} = \text{slope} \times \text{simulation time}
+\end{equation}
+
+and verify that this drift is smaller than the standard deviation (SD) of the fluctuations \cite{frenkel_smit}, i.e., it satisfies the criterion:
+\begin{equation}
+    \text{total drift} < \text{SD}
+\end{equation}
+\bigskip
+
+However, this criterion is less effective when applied to the total energy: even perfectly equilibrated systems may exhibit a small systematic drift that does not vanish upon averaging. This drift originates from finite–time–step integration errors, which accumulate over long trajectories, while the intrinsic thermal fluctuations of the total energy remain comparatively small.
+
+Following common practice, the significance of this drift is evaluated through the relative energy drift, defined as:
+\begin{equation}
+    \frac{\text{total drift}}{\langle E\rangle}
+\end{equation}
+where $\langle E\rangle$ denotes the average total energy over the trajectory. In this work, we impose a threshold value of
+\begin{equation}
+    \frac{\text{total drift}}{\langle E\rangle}
+    < 10^{-5}
+\end{equation}
+
+which ensures that the accumulated drift remains much smaller than the conserved quantity itself, indicating numerically stable behaviour of the integrator over nanosecond time scales.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1\linewidth]{photos/therm.png}
+    \caption{Time evolution of temperature (T), potential energy (PE), total energy (Etot), and pressure (P) over the full simulation time. The initial 1 ns thermalization stage is shown in blue, followed by a 1 ns equilibration stage in green, and finally the 100 ns production run in yellow. All quantities are expressed in LAMMPS metal units.}
+    \label{fig:therm}
+\end{figure}
+
+It is important to note, however, that this approach is inherently reductive. As discussed extensively in literature , energy drift cannot be fully characterized by a single number: assumptions of linear scaling with simulation length, temperature, or system size are generally incorrect, and a clear distinction must be made between systematic and random drift, as well as between integration and numerical errors \cite{Eastman2017EnergyConservation}. Moreover, good long time energy conservation is not always a reliable indicator of simulation accuracy, having a small overall drift is neither a sufficient nor, in some cases, a necessary condition for producing meaningful physical results \cite{Zhang2023}.\bigskip
+
+
+The next step consists of the actual computation of the thermal conductivity, which is performed using the Green–Kubo method in the \texttt{analyze\_kappa} function. For each spatial direction ($x$, $y$, $z$), the function analyzes the heat flux $J_i(t)$ produced by LAMMPS, dividing the simulation into sliding time windows of a certain number of steps, with an advance of one window and the next. This approach allows for multiple statistically quasi-independent realizations of the process, increasing the number of calculations for thermal conductivity in a single simulation.
+
+Within each window, the normalized heat flux autocorrelation function (HFACF) is calculated:
+\begin{equation}
+    A_{\text{corr}}(t) = 
+    \frac{\langle J_i(0)\cdot J_i(t) \rangle}{\langle J_i(0)\cdot J_i(0) \rangle}
+\end{equation}
+using the Fast Fourier transform method (FFT) \cite{press2007numerical, autocorr_fft}, and $t = 0$ denotes the initial time within each analysis window.\bigskip
+
+To obtain a clearer understanding of the HFACF behaviour, it is useful to approximate it with an analytical function. The single exponential function was first used to fit the HFACF; however, it resulted in an underestimation of the thermal conductivity \cite{Schelling2002}. A similar fitting approach in the frequency domain, based on the single exponential decay of the HFACF, was proposed by Volz et al. \cite{Volz2000}, but it was also found to suffer from the same problem \cite{Schelling2002}. 
+
+This is due to the two-stage decay characteristic of the HFACF, which originates from the different relaxation times of optical and acoustic phonons, which the single exponential fitting fails to capture. In this context, a double exponential function was proposed to fit the HFACF; however, the computed thermal conductivity was still lower than the experimental values. 
+
+Therefore, following the suggestion of Chen et al., we introduced a non-zero correction in the double exponential fitting approach, fitting the HFACF according to the following function:
+\begin {equation}
+    A_{\text{corr}}(t) = A_1 e^{-t/\tau_1} + A_2 e^{-t/\tau_2} + Y_0
+\end{equation}
+where $\tau_1$ and $\tau_2$ represent the relaxation times of optical and acoustic phonons, respectively.\bigskip
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1\linewidth]{photos/acf&fitacf.png}
+    \caption{Heat flux autocorrelation function and its double exponential fit. A logarithmic scale is used for the x-axis to better show the decaying behaviour.}
+    \label{fig:ac}
+\end{figure}
+
+As shown in Figure \ref{fig:ac}, over time, the HFACF becomes increasingly inaccurate due to the decreasing number of statistically independent samples, and numerical noise inevitably contaminates the signal once it decays to small values. Therefore, the HFACF is only reliable up to a finite cut-off time. \bigskip
+
+To establish the extent to which autocorrelation should be integrated (i.e., to define the cut-off time $\tau_c$), two functions were taken into consideration: the local mean of the autocorrelation function $\mathbb{E}(\text{Cor}(t))$ and the relative fluctuation function $F(t)$ (Figure \ref{fig:F-E}).  Both of them are derived from the heat flux autocorrelation function $A_{\text{corr}}(t)$ within a moving window of width $\delta$. For each time origin $t_j$, the functions are defined as:
+\begin{equation}
+    \mathbb{E}(t_j) = \frac{1}{\delta} \sum_{k=j}^{j+\delta} A_{\text{corr}}(t_k)
+    \hspace{2cm} 
+    F(t_j) =\frac{\sqrt{\mathrm{Var}\!\left[A_{\text{corr}}(t_k)\right]_{k=j}^{j+\delta}}}
+    {\mathbb{E}(t_j)}
+\end{equation}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1\linewidth]{photos/F-E.png}
+    \caption{Comparison between the local mean of the HFACF $\mathbb{E}(t)$ (right) and the corresponding fluctuation function $F(t)$ (left). The red dots with arrows indicate the first peak of the function $F(t)$ and the first zero of the function $\mathbb{E}(t)$, and, as can be observed in the legends, the two points correspond.}
+    \label{fig:F-E}
+\end{figure}
+
+The first zero of the mean $\mathbb{E}(t)$ marks the loss of physical correlation, while the first peak of $F(t)$ indicates the onset of numerical noise. The two criteria often coincide. 
+
+As illustrated in Figure \ref{fig:F-E-delta}, the parameter $\delta$ controls the degree of temporal averaging: large values of $\delta$ yield smoother $\mathbb{E}(t)$ and $F(t)$ curves due to the stronger averaging over time, while smaller $\delta$ values provide higher temporal resolution but introduce more statistical noise in the resulting functions. In this analysis, $\delta = 1000 \text{ steps}=1$ ps is used, which represents a good compromise between resolution and noise.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1\linewidth]{photos/F-E-delta.png}
+    \caption{ Effect of the parameter $\delta$ on the behaviour of the functions $F(t)$ and $E(t)$. Large $\delta$ $\rightarrow$ smoother $F(t)$ and $E(t)$ curves, small $\delta$ $\rightarrow$ higher temporal resolution, but increased noise due to reduced averaging.}
+    \label{fig:F-E-delta}
+\end{figure}
+
+While identifying the first zero of $\mathbb E(t)$ is straightforward, the detection of the first peak of $F(t)$ can be trickier. This is performed using the \texttt{find\_peaks} function from the \texttt{scipy.signal} module, which identifies local maxima exceeding a specified prominence, which quantifies how much a peak stands out from its surroundings (Figure: \ref{fig:F-E-prom}).
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1\linewidth]{photos/F-E-prom.png}
+    \caption{Effect of the prominence parameter on the detection of the first peak of the function $F(t)$ (right), shown for a fixed value of $\delta=1000$. The corresponding function $E(t)$ (left) is shown for reference. The dots indicate the peaks identified for different prominence values. As the prominence decreases, additional minor peaks become detectable, for values between $10^{-3}$ and $10^{-4}$, the sensitivity remains nearly unchanged. A prominence value of $\text{prom} = 7\times10^{-4}$ was therefore selected as an optimal compromise between noise suppression and peak sensitivity.}
+    \label{fig:F-E-prom}
+\end{figure}
+
+In this analysis, $F(t)$ is first normalized as $F_\text{norm}(t) = F(t)/F_{\max}$, and peaks are then detected using a chosen value of the prominence ($=7\times 10^{-4}$). A higher prominence filters out minor oscillations and numerical noise, ensuring that only well-defined peaks are counted. When a smaller prominence is used, it increases sensitivity, allowing the detection of weaker peaks.\bigskip
+
+To determine the appropriate correlation time, two independent methods were employed to obtain alternative estimates of $\tau_c$: the First Avalanche method (FA) and the First Dip method (FD).
+FA identifies the cut-off time ($\tau_c$) of the HFACF as the point at which the cumulative function suddenly becomes very large, indicating a prevalence of numerical noise. The signal up to this point is assumed to be reliable, and everything after it is discarded, preventing accumulated noise from distorting the thermal conductivity calculation.
+FD establishes $\tau_c$ when the HFACF first decays to zero: technically, this is the first point at which the signal goes to zero or forms a cumulative plateau.
+
+If a well-defined plateau or peak is observed in the cumulative conductivity plot (see Figure \ref{fig:k_int}), FD can estimate $\tau_c$ similarly to FA, producing comparable results. However, as pointed out by Chen et al., when the plateau is not well-defined, FD tends to overestimate $\tau_c$, as it also interprets contributions from persistent numerical noise as significant, thus leading to an overestimation of the thermal conductivity. So, based on these observations, it was decided to rely exclusively on the FA method for establishing the cut-off time. 
+\bigskip
+
+Direct thermal conductivity is obtained by integrating the HFACF up to the cut-off time:
+\begin{equation}
+    \kappa_u(t) = 
+    \frac{1}{V k_B T^2} 
+    \int_0^{\tau_c} \langle J_u(0) \cdot J_u(t) \rangle \, dt
+\end{equation}
+
+using the trapezoidal method and where $J_u(t)$ is the total flux of the system (not normalized by $V$) in the $u=x,y,z$ direction.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\linewidth]{photos/k_int.png}
+    \caption{Cumulative integral of the thermal conductivity $\kappa(t)$ obtained from both the raw (blue curve) and the fitted (green curve) integrations of the HFACF. The points marked with red and green arrows indicate the cut-off times determined using the FA and FD methods, respectively. The plot shows that, in this case, the two criteria coincide, indicating that the two approaches are, in most cases, equivalent.}
+    \label{fig:k_int}
+\end{figure}
+
+Alternatively, by integrating the double exponential fit, two analytical expressions are obtained \cite{Chen2013ImproveAccuracyEMD}:
+\begin{align}
+    \kappa_C &= \frac{A_{\text{corr}}(0)}{k_B T^2 V}(A_1 \tau_1 + A_2 \tau_2) \\
+    \kappa_F &= \frac{A_{\text{corr}}(0)}{k_B T^2 V}(A_1 \tau_1 + A_2 \tau_2 + Y_0 \tau_c)
+    \label{eq:kF}
+\end{align}
+
+The two formulas differ by the additional term $Y_0 \tau_c$, which accounts for the contribution of the long tail of the HFACF. Based on the study conducted by Chen et al., the inclusion of this term leads to thermal conductivity values that are in better agreement with experimental data. For this reason, in the present thesis work, the estimate $\kappa_F$ was adopted as the reference value for the thermal conductivity.\bigskip
+
+To summarize what we have achieved so far: we calculated the HFACF, with its cut-off time using the FA method $\tau_{FA}$, and, once integrated, obtained the thermal conductivity value $\kappa_{FA}$. Subsequently, from the HFACF fit parameters, we calculated another thermal conductivity value $\kappa_{F}$ using the formula proposed by Chen et al. All this was done on a single calculation window of $10^7$ steps ($=10$ ns), so for the next iteration, we move to the next window of the same size and repeat the process. This continues until the last window reaches the end of the simulation (100 ns) and the cycle stops, saving all of the data in \texttt{.npz} files. This entire procedure is then repeated for each spatial direction (x, y, z), allowing us to obtain the thermal conductivity along the three Cartesian axes.\bigskip
+
+We now have all the data needed to obtain a final value for the thermal conductivity of the system. At this stage, the post-processing diverges into two distinct paths depending on the system's characteristics. In the case of a spatially isotropic system, the three directions ($x$, $y$, and $z$) can be treated equivalently, allowing for a combined analysis. The function \texttt{plot\_kappas\_iso} retrieves thermal conductivity data from \texttt{.npz} files corresponding to various spatial directions $(x, y, z)$ and merges them into a unified isotropic visualization, see Figure \ref{fig:kappa_summary_iso}. For each direction, it loads temporal conductivity curves $\kappa(t)$ along with associated parameters ($\tau_{FA}, \kappa_{FA}, \kappa_F$), subsequently plotting all curves to illustrate their variability. It also computes the mean and standard deviation of $\kappa(t)$ across all datasets to present an averaged conductivity curve complete with uncertainty bands ($\pm1\sigma$). In the end, it displays both the individual and average FA points, saves the resulting figure, and generates a text summary that includes the mean and standard deviation of $\tau_{FA}$, $\kappa_{FA}$, and $ \kappa_F$ values, which are our final results.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1\linewidth]{photos/kappa_summary_iso.jpg}
+    \caption{
+    Summary plot of the thermal conductivity analysis for an isotropic system.  
+    For each spatial direction ($x$, $y$, and $z$), the corresponding $\kappa(t)$ curves are loaded and displayed together with their First Avalanche (FA) estimates.  
+    In blue, the mean isotropic conductivity is computed by averaging the $\kappa(t)$ curves, and is shown together with its uncertainty band ($\pm 1\sigma$). Finally, the yellow star represents the average of all the $\kappa_{FA}$ values.}
+    \label{fig:kappa_summary_iso}
+\end{figure}
+If the system lacks spatial isotropy, a similar procedure is adopted; however, the three Cartesian directions must be treated separately. In this case, each component of the thermal conductivity tensor is computed independently, allowing one to capture possible directional dependencies arising from structural anisotropy or external constraints. \bigskip
+
+\subsection{Determination of the analysis window length}
+A principal source of error in the computation of the thermal conductivity, via the Green-Kubo method, is that the autocorrelation function requires a long averaging time to reduce remnant noise \cite{OliveiraGreaney2017}. 
+So the choice of the time window used to compute the HFACF directly affects both the statistical accuracy and the physical reliability of the results. 
+
+A too-short window may not capture the full decay of the autocorrelation function, especially when the relaxation time of the system is long. In such cases, the HFACF may appear noisy and poorly converged (Figure \ref{fig:acf-windows}), leading to significant errors in determining the correlation time and, when integrated, to obtain the thermal conductivity. 
+
+On the other hand, using a larger window improves the ensemble averaging and reduces statistical fluctuations, but it also increases computational cost and may introduce noise at long times where the signal becomes very weak. Therefore, an optimal window size must be found.\bigskip
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1\linewidth]{photos/acf-windows.png}
+    \caption{A plot displaying various HFACFs calculated over multiple time windows shows that the functions exhibit greater noise at longer timescales. Additionally, they demonstrate considerable variation at times that are near the correlation timescale; thus, for a good analysis, it is crucial to find a balance between the number of HFACF computations (i.e., the number of thermal conductivity calculations) and a sufficiently large window that can minimize noise.}
+    \label{fig:acf-windows}
+\end{figure}\bigskip
+
+The search for the optimal window size must take into consideration the total length of the simulation. Since excessively long simulations are computationally expensive, it becomes essential to find a balance between the window size and the number of windows that can be extracted from a single trajectory. A larger window improves the accuracy of the HFACF, but it reduces the number of independent samples available for averaging the thermal conductivity. On the other side, smaller windows increase the number of statistical samples but produce a much noisier HFACF, which translates into a greater difficulty in determining the correlation time and, therefore, the value of thermal conductivity. \bigskip
+
+The following analysis examines the impact of window size selection on the uncertainty in the computed thermal conductivity for both direct integration $\kappa_{FA}$ and the thermal conductivity computed from Chen et al.'s formula $\kappa_{F}$. \bigskip
+
+For this analysis, a standard bulk configuration was selected, consisting of a $5\times5\times5$ FCC unit cell supercell, for a total of 500 atoms. This relatively small system allowed simulations to be performed quickly, enabling the preliminary analyses to be completed as soon as possible before moving on to larger systems.
+Therefore, the system was simulated for 100 ns, generating the file containing the instantaneous heat flux along the x, y, and z directions. Then, following the procedure described above, computed the mean value of the thermal conductivity and its error, which was then evaluated as a function of the window size in two complementary ways. \bigskip
+
+Initially, the error was assessed by varying the window size while keeping the total number of windows constant, i.e., maintaining the same number of samples $\kappa_i = \kappa_{FA}, \kappa_F$ (Figures \ref{fig:error_vs_window_fixedN_10}, \ref{fig:window_results_fixedN_10}). This procedure was intended to evaluate how the noise in the HFACF influences directly the final determination of the system's thermal conductivity.
+\bigskip
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1\linewidth]{photos/error_vs_window_fixedN_10.png}
+    \caption{Dependence of the statistical error in the computed thermal conductivity on the window size, with the number of windows (i.e., the number of $\kappa$ samples) kept fixed at $30$.}
+    \label{fig:error_vs_window_fixedN_10}
+\end{figure}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1\linewidth]{photos/window_results_fixedN_10.jpg}
+    \caption{Values of $\kappa_{FA}$, $\kappa_{F}$ with corresponding errors, for each window size (with the number of windows kept fixed at $30$).}
+    \label{fig:window_results_fixedN_10}
+\end{figure}
+\bigskip
+
+Secondly, the statistical error was analysed as a function of the window length while keeping the total simulation time constant, so that the number of windows—and consequently the number of averaged $\kappa_{i}$ values—varies across different tests (Figures \ref{fig:error_vs_window}, \ref{fig:window_results}). This analysis was specifically carried out in order to evaluate whether, despite the increased noise observed in the HFACFs associated with shorter windows, the generation of a larger number of individual $\kappa_i$ samples could effectively reduce the overall uncertainty in the final estimate of the system's thermal conductivity. By systematically varying the window length and examining the resulting statistical error, it was possible to gain insight into the trade-off between window size, averaging, and accuracy in the computation of thermal transport properties.
+\bigskip
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1\linewidth]{photos/error_vs_window.png}
+    \caption{Dependence of the statistical error in the computed thermal conductivity on the window size, for a fixed total simulation time. In this case, the number of windows, and thus the number of averaged $\kappa_i$ values, varies accordingly. In fact, fixing the simulation time of $100$ ns, a window length of $500$ ps ($=500,000$ steps) gives rise to $100/0.5=200$ values of $\kappa$ for each spatial direction; on the other hand, a window length of $10$ ns produces only $10$ values of $\kappa_{i}$.}
+    \label{fig:error_vs_window}
+\end{figure}
+
+\begin{figure}[H]
+        \centering
+        \includegraphics[width=1\linewidth]{photos/window_results.jpg}
+        \caption{Values of $\kappa_{FA}$, $\kappa_{C}$, $\kappa_{C}$ with corresponding errors, for each window size (with the number of windows free to vary.}
+        \label{fig:window_results}
+\end{figure}
+
+In both analyses, we observed that the statistical error decreased as the window size increased, as shown in Figures \ref{fig:error_vs_window} and \ref{fig:error_vs_window_fixedN_10}. This trend indicated that larger windows led to more stable estimates of the thermal conductivity, since the time correlations in the heat flux were better captured over longer averaging intervals.\bigskip
+
+Based on these results, we therefore performed all the following simulations with a total duration of $100$ ns and divided each trajectory into ten windows of $10$ ns, obtaining for each window three values of the thermal conductivity, one for each Cartesian direction. Then, for spatially isotropic systems, all 30 values were averaged, improving the statistical reliability of the results.
+
+
+\subsection{Determination of the timestep}
+Before the study of how porosity influences the thermal conductivity, there is another parameter that deserves attention: the time step of the simulation. Until now, a time step of 1 fs was used (standard for metals), but since the goal is to study very large systems made up of hundreds of thousands of atoms, it is important to check if we can increase the time step and whether this influences the final results in any way. To test this, the $5\times5\times5$ bulk configuration was simulated using different time steps: 1 fs, 2 fs, 5 fs, 10 fs, and 20 fs. The evolution of the thermodynamic quantities was first compared during the simulations to check for any drift introduced by the different time integration steps.
+
+The analysis of thermodynamic quantities and energy drifts for different simulation time steps is summarized in Table \ref{tab:thermo_drifts}. For the smallest time steps, 1 fs and 2 fs, the temperature drift remained well below the standard deviation, indicating that the system was effectively at equilibrium according to the chosen criterion. Increasing the time step to 5 fs and 10 fs resulted in slightly larger drifts, but still below the standard deviation, suggesting that the dynamics remained reasonably stable. Only the largest time step, 20 fs, led to a significant drift, double the value of the standard deviation, signalling a noticeable deviation from energy conservation and unstable dynamics.
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|c c c c c c c |}
+\hline
+$\Delta t$ & Quantity & Mean & Error & Std/Fluc & Drift & Note\\
+\hline
+1 fs  &  $T$    & 290.2546 & 3.3803e-02 & 7.5586  & 0.1333 & negligible\\
+2 fs  &  $T$    & 290.0973 & 3.3670e-02 & 7.5290  & -0.4032 & negligible\\
+5 fs  &  $T$    & 290.6244 & 3.3795e-02 & 7.5568  & 1.2880 & negligible\\
+10 fs &  $T$    & 290.5989 & 3.3817e-02 & 7.5617  & 2.4847 & negligible\\
+\rowcolor{black!6} 20 fs &  $T$    & 296.5672 & 4.1971e-02 & 9.3850  & 18.425 & significant\\
+\hline
+\end{tabular}
+\caption{Summary of thermodynamic quantities and energy drifts for different simulation time steps. Drift values are compared with the standard deviation (SD): \textit{negligible} indicates drift $< \text{SD} $, while \textit{significant} (highlighted row) indicates drift $\geq \text{SD}$.}
+\label{tab:thermo_drifts}
+\end{table}
+
+
+
+Therefore, except in cases where deviations may arise due to systems not fully at equilibrium, such as highly porous structures, a time step of up to 10 fs can be safely employed. However, the observed behaviour indicates that reducing the time step systematically decreases the magnitude of the drift, and this effect should be taken into account when choosing the integration parameters for accurate simulations.\bigskip 
+
+The comparison of the resulting HFACFs (Figures \ref{fig:diff_dt}, \ref{fig:k_diff_dt}) shows that the short-time oscillations, corresponding to the high-frequency components of the heat flux, remain essentially identical for all time steps, demonstrating that the HFACF is already well resolved even with larger time steps. This is consistent with the fact that the characteristic phonon timescales in Au bulk are on the order of several picoseconds \cite{chase2015}, and these recording intervals remain much shorter than the relevant lattice dynamical timescales.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1\linewidth]{photos/diff_dt.png}
+    \caption{Here is shown the HFACF computed for different time steps, reported in the legend in ps. It is immediately apparent that the behaviour of the HFACF is accurately represented at every timestep.}
+    \label{fig:diff_dt}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1\linewidth]{photos/timestep_results.jpg}
+    \caption{Thermal conductivity values computed for the simulated system using different integration time steps. Despite the varying time steps, all results are comparable, reflecting the similarity of the corresponding heat flux autocorrelation functions (HFACFs) at short times.}
+    \label{fig:k_diff_dt}
+\end{figure}
+
+To better identify the limits of admissible subsampling, a stride parameter was introduced in the computation of the HFACF. Instead of using every value of the heat–flux time series, the stride selects one data point every $n=\text{stride}$ steps, effectively reducing the temporal resolution while keeping the overall time span unchanged. This procedure makes it possible to evaluate how the HFACF is affected when the sampling interval is progressively increased, thereby mimicking the effect of saving the heat flux less frequently during the simulation. The term \textit{stride} is used here following the common Python nomenclature, where it denotes the step size between consecutively selected elements in an array or time series. In analogy with slicing operations (e.g. \texttt{x[::stride]}), the parameter represents the interval at which data points are sampled. 
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1\linewidth]{photos/diff_stride.png}
+    \caption{HFACFs computed with different stride values (1, 10, 25, 50, 100, 500 fs, time step = 1 fs). The short-time oscillations remain essentially identical up to 50 fs, indicating that reduced sampling still captures the dominant features of the correlation function.}
+    \label{fig:diff_stride}
+\end{figure}
+By computing the HFACF with different stride values (1, 10, 25, 50, 100, 500 steps), see Figure \ref{fig:diff_stride}, we observed that the shape and short-time oscillations of the correlation function remain essentially identical until a stride of 50 is reached, as already seen when varying the simulation time step. This confirms that the dominant physical features of the HFACF are well captured even with reduced sampling frequency.  
+
+Even if sampling the heat flux at every integration step (1 fs) provides the highest temporal resolution, it also produces very large files and can slow down the simulations. However, as was seen in this short analysis, the physically relevant components of the heat flux vary on slower time scales. So, in this case, it should be possible to reduce the sampling frequency, for example, recording the flux every 10 or 20 fs, without losing significant information.\bigskip
+
+From this analysis, it can be concluded that a time step of 1 fs is appropriate for the present system sizes. This choice guarantees a stable integration of the equations of motion and keeps the drift of the thermodynamic quantities well below their standard deviation, even in more disordered configurations or systems containing defects.
+Regarding the sampling of the heat flux, recording $J$ every 10 time steps (every 10 fs) produces HFACFs that are indistinguishable from those computed at every step. Therefore, such a sampling rate can be safely adopted to significantly reduce data storage and computational cost without affecting the accuracy of the calculated thermal conductivity.
+
+
+
+\section{Application to Different Bulk-like Systems}
+After outlining the structure of my workflow, identifying the relevant parameters, and understanding their interactions with the data and results, it is now time to implement it across various systems to observe the results we obtain. 
+
+In the following section, we will progressively explore how structural modifications affect the thermal behaviour of the system. Starting from the perfect bulk configuration, we will gradually introduce different types and concentrations of porosity, enabling a comparison not only between various defect geometries and defect concentrations.
+
+
+\subsection{Bulk}
+The first configuration, as mentioned in the previous section, was built using the ASE Python library, as will also be the case for the next ones. In this case, I implemented a function named \texttt{create\_bulk(n)} that generates a face-centred cubic crystal of gold made up of $ n \times n \times n$ unit cells. The structure is built using ASE’s \texttt{FaceCenteredCubic} class \cite{lattice2017}, specifying the atomic symbol, Au in this case, the orientations of the crystal, along $[100]$, $[010]$, and $[001]$ directions, and the size$=(n,n,n)$. Periodic boundary conditions are applied in all three spatial directions to represent an infinite crystal lattice. \bigskip
+
+As a first analysis, I wanted to see if the thermal conductivity of the gold bulk was independent of the supercell size simulated. So using the function \texttt{create\_bulk(n)}, I chose different numbers of unit cells $n$ to prepare multiple bulk configurations of various sizes, as shown in Figure \ref{fig:bulks}.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1\linewidth]{photos/bulks.png}
+    \caption{Different supercell sizes simulated. From left to right: $n=2, 3, 4, 5, 8, 11, 14$ number of unit cells, containing 32, 108, 256, 500, 2048, 5324, 10976 atoms, respectively.}
+    \label{fig:bulks}
+\end{figure} 
+
+Subsequently, I simulated all the systems described above, as outlined in the previous section, and processed the raw data produced by LAMMPS using my post-processing code. The thermal conductivity values extracted for each supercell size are shown below in Figure \ref{fig:bulk_results}, providing insight into the effect of supercell size on the computed bulk thermal conductivity.
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1\linewidth]{photos/bulk_results.jpg}
+    \caption{Thermal conductivity $\kappa$ of gold bulk as a function of the supercell size. Every point represents an average of 30 separate calculations of $\kappa$, simulating $100$ns, divided into 10 segments of 10ns and across three spatial dimensions. The supercell size n is labelled as \texttt{BULK(n)\_10ns} on the x-axis.}
+    \label{fig:bulk_results}
+\end{figure}
+It is evident that the thermal conductivity is relatively low for the smallest supercell ($n=2$) and increases rapidly as the cell size grows. By $n=4$, it has essentially stabilized at a value of approximately $6.5$ W/mK and remains constant for larger supercells. This behaviour can be understood in terms of finite-size effects: small simulation cells artificially constrain the phonon spectrum, limiting the long-wavelength modes that contribute significantly to heat transport. As the supercell size increases, these long-wavelength phonons are allowed, leading to a rapid increase in the computed thermal conductivity until the system reaches a size where the phonon spectrum is sufficiently sampled, and the conductivity converges.\bigskip
+
+From now on, to study the different degrees of porosity, we will use the bulk configuration with a supercell size of $n=11$ as my standard system, with a simulation box of $(44.88\times44.88\times44.88)\AA^3$ and a total of 5324 atoms. This choice represents a good compromise: the cell is large enough to accommodate the relevant phonon spectrum and allows the introduction of defects or other structural modifications without encountering artefacts due to the limited system size, while still keeping the computational cost manageable. In the conclusion section, all the measured thermal conductivity values of the different systems will be compared with that of the bulk configuration.
+
+
+\subsection{Void}
+To investigate the effect of internal cavities on the structural and thermal behaviour of gold, a series of configurations featuring a central spherical void was generated. This process was carried out using the function \texttt{create\_void(radius)}, which begins from the $11\times11\times11$ bulk gold structure and removes all atoms located within a sphere of a specified radius, thereby creating a well-defined internal cavity at the center of the system.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1\linewidth]{photos/voids.png}
+    \caption{Bulk gold supercells containing a central spherical void of increasing radius. From left to right, the radius increases linearly (= $3, 5, 7, 9, 11, 13\; \AA$), resulting in progressively larger cavities within the FCC lattice. The different colours of the atoms represent the coordination number (CN) analysis, and on the right, a colour scale (gradient) indicates the corresponding CN values, ranging from 7 to 12.}
+    \label{fig:voids}
+\end{figure}
+
+Following the creation of the initial configuration with a central void, the void radius was increased linearly (Figure \ref{fig:voids}), thereby removing an increasingly larger number of atoms. Six different systems were considered:
+\begin{table}[H]
+\centering
+\begin{tabular}{c c c}
+\hline
+Radius ($\AA$) & Atoms removed & Porosity\\
+\hline
+3 & 6 & 0.11\% \\
+5 & 38 & 0.71\% \\
+7 & 92 & 1.73\% \\
+9 & 188 & 3.53\% \\
+11 & 370 & 6.95\% \\
+13 & 490 & 9.20\% \\
+\hline
+\end{tabular}
+\label{tab:void_sys}
+\end{table}
+
+For each of these configurations, I performed Green–Kubo simulations to evaluate how the thermal conductivity of gold is influenced by the progressive introduction of a bigger central void.
+Following this procedure, the resulting trend is clear, as shown in Figure \ref{fig:void_results}: the thermal conductivity decreases monotonically with the increasing number of removed atoms. This behaviour directly reflects the reduced efficiency of heat transport in systems where defects disrupt the propagation of vibrational energy through the lattice.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1\linewidth]{photos/void_results.jpg}
+    \caption{Thermal conductivity of gold as a function of the number of removed atoms. The conductivity decreases monotonically as the void size increases.}
+    \label{fig:void_results}
+\end{figure}
+
+
+If instead we examine the results as a function of the void radius rather than the number of removed atoms, another interesting trend is revealed: the thermal conductivity decreases roughly linearly with increasing void radius.
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1\linewidth]{photos/void_radius_results.jpg}
+    \caption{Thermal conductivity of gold as a function of the void radius. The conductivity decreases linearly as the void size increases.}
+    \label{fig:void_radius_results}
+\end{figure}
+
+
+\subsection{Holes}
+To generate nanoporous gold structures with a controlled level of void fraction, the function \texttt{create\_holes(atoms\_removed, radius)} was developed, which randomly creates multiple spherical cavities of the given radius and removes the containing atoms, until the target number is reached, with variable accuracy (higher for small spheres, lower for larger ones). We will refer to the systems with these specific defects as ``holes systems''.
+
+One particular challenge was to introduce defects while respecting periodic boundary conditions; atomic replicas are created in neighbouring cells and managed through a k-d tree (using \texttt{scipy.spatial.cKDTree} \cite{scipy_cKDTree}) to efficiently identify atoms within the removal spheres, even across periodic boundaries. 
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1\linewidth]{photos/holesfixedr.png}
+    \caption{Bulk gold supercells containing various spherical hole defects. From left to right, the number of holes carved increases, resulting in progressively larger cavities within the FCC lattice. The different colours of the atoms represent the CN of each atom, and on the right, a colour scale (gradient) indicates the corresponding CN values, ranging from 5 to 12.}
+    \label{fig:holesfixedr}
+\end{figure}
+
+
+As a first analysis, we decided to see how the conductivity of gold varies when we introduce spherical holes of the same size (fixed radius) but in an increasingly larger number. In particular, to make a direct comparison with the void, we built five different systems (see Figure \ref{fig:holesfixedr}), eliminating atoms in a number comparable to those removed from the void, which allows one to generate configurations with the same total porosity but with a different spatial distribution of empty regions:
+\begin{table}[H]
+\centering
+\begin{tabular}{c c c c}
+\hline
+Target atoms & Atoms removed & Percentage removed \\
+\hline
+38 & 38 &0.71\% \\
+92 &  86 &1.62\%\\
+188 & 215 &4.04\%\\
+370 & 387 &7.27\%\\
+490 & 514 &9.65\%\\
+\hline
+\end{tabular}
+\label{tab:holes_sys}
+\end{table}
+
+Having simulated the various systems and performed the post-processing in Python, the results we obtain follow the usual trend (Figure \ref{fig:holesfixedr_results}), fully consistent with expectations: as the number of removed atoms increases, the thermal conductivity systematically decreases due to the progressive disruption of heat-transport pathways thanks to the additional cavities. 
+
+Notably, we can already observe that when compared to the single central void, the holes system exhibits a significantly lower conductivity for the same number of missing atoms, highlighting the stronger impact of a distributed porosity network on thermal transport.
+
+\begin{figure} [H]
+    \centering
+    \includegraphics[width=1\linewidth]{photos/holesfixedr_results.jpg}
+    \caption{Thermal conductivity of the holes systems as a function of the number of removed atoms. As porosity increases, the conductivity decreases monotonically, in agreement with the expected enhancement of phonon scattering at the surfaces of the multiple spherical cavities.}
+    \label{fig:holesfixedr_results}
+\end{figure}
+
+As a second analysis, we investigated how the size of the holes influences the final thermal conductivity of the system. To this end, we kept the number of removed atoms approximately constant while increasing the radius of the spherical cavities linearly from 3 to 7 $\AA$. Although the total number of missing atoms is nearly the same across the configurations, small fluctuations are unavoidable because atoms are removed in discrete groups corresponding to entire spheres. We selected a target value of about 370 removed atoms, and for each radius, we generated a configuration as close as possible to this number. 
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1\linewidth]{photos/holesfixedn.png}
+    \caption{Bulk gold supercells containing multiple spherical holes generated to remove approximately the same number of atoms. From left to right, the radius of each carved sphere increases from 3 to 7 $\AA$, resulting in fewer but larger cavities while keeping the total removed volume nearly constant. The different colours of the atoms represent the coordination number (CN), and on the right, a colour scale indicates the corresponding CN values, ranging from 4 to 12.}
+    \label{fig:holesfixedn}
+\end{figure}
+
+The results, shown in Figure \ref{fig:holesfixedn_results}, that we obtain from the simulations follow a quite clear pattern: as the hole radius increases, the thermal conductivity increases as well. This behaviour indicates that, as was already hinted in the comparison between holes and central void, for a fixed amount of removed material, distributing the porosity into fewer and larger cavities creates less disruption to the flow of phonons compared to using many small holes, leading to a more efficient heat-transport pathway.
+\begin{figure}[H]
+        \centering
+        \includegraphics[width=1\linewidth]{photos/holesfixedn_results.jpg}
+        \caption{Thermal conductivity of the holes systems with a fixed number of atoms removed, but varying the radius of the holes. As the size of the spheres increases, the conductivity rises.}
+        \label{fig:holesfixedn_results}
+\end{figure}
+
+\subsection{Vacancies}
+The next system that will be analysed is a bulk to which point defects are introduced, randomly removing atoms. In this way, we generate atomic vacancies distributed throughout the crystal. For simplicity, we will refer to these configurations collectively as ``vacancies systems''.
+To introduce these defects into the bulk structure, the function \texttt{create\_vacancies(atoms\_removed)} was used, which takes as input the desired number of atoms to be removed and, starting from the bulk configuration, deletes them randomly one by one.\bigskip
+
+We constructed five different vacancy systems by removing 6, 22, 38, 65, and 92 atoms, as shown in Figure \ref{fig:vacancies}. The first, third, and fifth configurations were selected to match the number of atoms removed in the corresponding void and holes systems, allowing for a direct comparison between point-defect and spherical-defect porosity. The remaining two configurations (22 and 65 removed atoms) were included as intermediate cases, chosen to provide a smoother sampling between the adjacent vacancy levels. Also, we noted that when a large number of atoms were removed using the vacancy method, the system struggled to reach equilibrium, prompting us to restrict the removal to fewer than 100 atoms.
+\begin{figure}[H]
+        \centering
+        \includegraphics[width=1\linewidth]{photos/vacancies.png}
+        \caption{Bulk gold supercells containing vacancy defects obtained by randomly removing 6, 22, 38, 65, and 92 atoms (left to right). The atom colours represent the coordination number (CN), with the scale on the right indicating values from 8 to 12. The CN analysis clearly highlights the presence of multiple adjacent vacancy sites forming around the removed atoms.}
+        \label{fig:vacancies}
+\end{figure}
+
+The thermal conductivity obtained via the Green-Kubo method for our vacancy systems decreases as the number of removed atoms increases. However, as can be seen in Figure \ref{fig:vacancies_results}, the thermal conductivity drops much more rapidly compared to systems with centred voids or dispersed spherical holes.
+\begin{figure}[H]
+    \centering
+\includegraphics[width=1\linewidth]{photos/vacancies_results.jpg}
+    \caption{Thermal conductivity of systems with increasing numbers of vacancies. As more atoms are removed, the conductivity decreases very rapidly, more than in the other system already considered.}
+    \label{fig:vacancies_results}
+\end{figure}
+
+\subsection{Nanopillars} \label{subsec:nanop}
+To test the versatility of our approach, we aim to extend the Green-Kubo method for thermal conductivity to systems that deviate even further from the perfect bulk structure, including non-periodic or partially periodic configurations, to assess whether the method can still be applied reliably and produce meaningful results.\bigskip
+
+We generated a new class of systems, referred to as pillars, which are constructed as columns of atoms extracted from a bulk FCC gold lattice. Three functions were used for this purpose. 
+The first one, \texttt{create\_pillar}, selects a rectangular column of atoms from the bulk, defined by side lengths in the x and y directions, while maintaining the original lattice periodicity. 
+The second one, \texttt{create\_column}, instead extracts a cylindrical column of atoms with a given radius. 
+Finally, the \texttt{create\_nanopillar} function allows the insertion of a pre-constructed nanopillar (read from a file) into a bulk lattice, aligning its center and adjusting the surrounding upper and lower slabs to preserve proper periodic boundary conditions along the z-axis. \bigskip
+
+We considered four different ``nanopillars'', which are taken from the study \textit{Hierarchical self-assembly of Au-nanoparticles into filaments: evolution and break} by Matteo Tiberi and Francesca Baletto \cite{TiberiBaletto2024}. Each nanopillar is composed of three gold nanoparticles stacked vertically: Dh192, TOh201, and Ih147, in four different relative orientations. The consideration of these pre-assembled clusters allows us to investigate how such arranged nanostructures influence the thermal transport, comparing them with pillars carved from a periodic lattice.\bigskip
+
+Following the same workflow described in the previous sections, we simulated all six pillar configurations, with periodic boundary conditions along the z-axis, effectively creating infinitely long wires in that direction. Although these systems do not fully reach a steady bulk-like equilibrium, given their geometry and under-coordinated regions, they relax to a quasi-stationary state suitable for analysis, characterised by periods of approximate equilibrium that are occasionally interrupted by sudden and rapid atomic recombinations. 
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1\linewidth]{photos/nano1PE.png}
+    \caption{Potential energy (PE) of a gold nanopillar (Nanopillar1, Figure \ref{fig:nano1}) over time. The red arrow highlights the region of the graph where a rapid atomic recombination occurs, while the periods before and after this event correspond to relatively long quasi-stationary intervals.}
+    \label{fig:nano1PE}
+\end{figure}
+
+In this sense, the pillar configurations represent a regime in which we intentionally push the applicability of the Green–Kubo method beyond ideal conditions to assess whether meaningful thermal conductivity estimates can still be obtained. \bigskip
+
+In addition to the transport analysis, we also examined the structural evolution of the pillars by computing the coordination number as a function of z and by performing a particle binning analysis for both the initial and the final state at $t\approx100$ ns. 
+These structural analyses allow us to evaluate whether the geometry and rearrangement of the pillars influence the resulting thermal conductivity.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.95\linewidth]{photos/pillar.jpg}
+    \label{fig:pillar}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.95\linewidth]{photos/column.jpg}
+    \label{fig:column}
+\end{figure}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.95\linewidth]{photos/nano1.jpg}
+    \label{fig:nano1}
+\end{figure}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.95\linewidth]{photos/nano2.jpg}
+    \label{fig:nano2}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.95\linewidth]{photos/nano3.jpg}
+    \label{fig:nano3}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.95\linewidth]{photos/nano4.jpg}
+    \caption{Coordination-number and particle-count analysis for all pillar configurations along the z-axis. (a) Rectangular pillar and (b) cylindrical column extracted from the bulk, and (c–f) the four nanopillar configurations constructed from stacked Au clusters. Each panel reports the average coordination number and the number of atoms per bin along the pillar axis. Several nanopillar structures display layers with both a reduced average coordination number and a low atomic count, indicating locally under-coordinated regions with fewer atoms per cross-sectional layer. These structural inhomogeneities may affect thermal transport by introducing localized scattering centres or by reducing the effective cross-sectional area available for heat flow.}
+    \label{fig:nano4}
+\end{figure}
+
+From these simulations, we extracted the thermal conductivity only along the z direction for all pillar systems (see Figure \ref{fig:pillar_results}). The structures carved directly from the bulk (rectangular pillars and cylindrical columns) exhibit a higher thermal conductivity compared to the nanopillar configurations.
+
+This behaviour is expected: the carved pillars tend to preserve the crystalline order of the bulk, maintaining high coordination numbers and continuous atomic layers along the heat-transport direction. The nanopillars, instead, although their initially under-coordinated regions tend to evolve toward coordination numbers similar to the bulk-derived pillars, retain irregular and reduced cross-sectional areas, as clearly shown by the atom-count profiles (Figure \ref{fig:nano4} for example), leading to a lower thermal conductivity.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1\linewidth]{photos/pillar_results.jpg}
+    \caption{Thermal conductivity of pillars carved from bulk versus nanopillar configurations, showing higher conductivity in the bulk-derived structures and reduced values for the nanopillars.}
+    \label{fig:pillar_results}
+\end{figure}
+
+
+\section{Nanoassembled films}
+After analysing several gold-based reference systems, ranging from perfect bulk structures to configurations containing vacancies, extended voids, and spherical pores, it becomes evident how the presence of defects and empty regions can profoundly alter the material's structural response and its thermal conductivity. These simplified models serve as a useful starting point for gaining insight into the effects of internal porosity, allowing one to study these influences under idealized and well-controlled conditions.
+
+However, in order to describe more realistic and technologically relevant systems, it becomes necessary to extend the analysis beyond simple bulk geometries, taking into account structures that exhibit strong anisotropy as well as multiple free-void interfaces. \bigskip
+
+With this in mind, we now transition to the study of nanofilms, exploring how the insights gained from the previous analyses can be applied to model these more complex and technologically significant systems.
+
+\subsection{Structural Characteristics}
+Nanoporous films obtained through low-kinetic-energy deposition of nanoparticles, such as the one illustrated in Figure \ref{fig:depo}, exhibit complex morphological and structural features, making them attractive for many applications. Numerous studies in the literature have studied the assembly processes of metallic and nanoporous nanofilms, highlighting how deposition dynamics and cluster morphology significantly influence the final film structure \cite{Borghi_2018}. \bigskip
+
+In this work, we focus on the research carried out by my co-supervisor, Dr. Giacomo Becatti, highlighting the aspects most relevant for comparing these systems with the bulk structures discussed earlier. His work presents a general methodology for assembling such films starting from arbitrary nanoparticle size and shape distributions, and analyzes how these parameters influence the final film structure.\bigskip
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\linewidth]{photos/depo.png}
+    \caption{Common Neighbour Analysis (CNA) of the deposited icosahedral gold nanoparticles forming a nanofilm on a Au substrate, performed in OVITO. The film remains macroscopically smooth despite local defects, which appear as regions containing atoms in BCC (0.1\%) or HCP (5.6\%) configuration; the rest consist of BCC (83.5\%) and surface atoms (10.8\%). Defective zones are especially visible at the contact planes between differently oriented crystallites and at necks between coalesced nanoparticles, where reduced coordination and voids of different sizes emerge.}
+    \label{fig:depo}
+\end{figure}
+
+These systems were built using three nanoparticle morphology sets: purely octahedral, purely icosahedral, and a mixed distribution where small clusters adopt an icosahedral shape and larger clusters an FCC-like octahedral structure. These nanoparticles were deposited on top of a three-layer substrate: a fixed bottom layer, a thermostatted intermediate layer to emulate bulk thermal behaviour, and an unconstrained upper layer evolving in the NVE ensemble. Nanoparticles were inserted at low velocity along the z direction, allowed to deposit over 0.5 ns, and subsequently equilibrated for an additional 1 ns.\bigskip
+
+All systems exhibited similar internal porosities, with significant differences emerging only near the free surface. Films composed of octahedral clusters showed a sharp rise of porosity to unity at the surface, while icosahedral-based films displayed a more gradual increase. This behaviour is linked to the geometric nature of the final deposited nanoparticles, where octahedra tend to form more cuboidal surface features, whereas icosahedra lead to smoother, more spherical surfaces, as shown in Figure \ref{fig:surface}.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\linewidth]{photos/surface.png}
+    \caption{Surface mesh of the nanofilm generated in OVITO, shown with periodic replications along the x and y directions. The mesh highlights the overall surface morphology of the film.}
+    \label{fig:surface}
+\end{figure}
+
+Due to the low deposition energy preserving most internal cluster structures, the microscopic properties of the films were strongly affected by nanoparticle morphology. Icosahedral-based systems exhibited a broader distribution of crystallite orientations, which in turn increased the variety of stacking faults, grain boundaries, and ultimately the dislocation density. Disordered atomic arrangements were mainly found at necks between coalesced nanoparticles, at the substrate–film interface, and in locally melted surface regions.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\linewidth]{photos/mesh.png}
+    \caption{Visualization of the dislocation network in the nanofilm using OVITO. The mesh traces the surface of the nanofoam, and in different colours are highlighted the dislocations inside the material: Shockley (green), perfect (blue), star–rod (magenta), Hirth (yellow), Frank (cyan), and others (red) \cite{hirth1982theory}.}
+    \label{fig:mesh}
+\end{figure}
+
+Overall, the macroscopic morphology of the films depends only weakly on nanoparticle shape (except surface porosity), while microscopic structural features, like crystallite orientation, defect density, dislocations, and local disorder, shown in Figure \ref{fig:mesh}, are strongly influenced by the complete morphology of the initial clusters.
+
+
+\subsection{Thermal conductivity of nanoassembled films}
+Among all these configurations, this work focuses on a system constructed by a single deposition of small icosahedral nanoparticles onto the substrate (Figures \ref{fig:depo}, \ref{fig:mesh}, \ref{fig:surface}), which has been shown to generate denser structures relative to larger ones, resulting in final configurations akin to those mentioned in the earlier section.\bigskip
+
+Analysis of the porosity per layer along the z direction of the system reveals a recurring pattern for all depositions. Starting from z=0, corresponding to the substrate, the film initially presents a compact region, with porosity equal to zero. Then, proceeding towards the surface, the porosity increases, approaching a value close to unity at the surface of the nanofilm.
+
+The calculation of porosity and its profile was performed using the code developed and used in Becatti's work, based on a Monte Carlo integration approach and the use of a k-d tree structure for the identification of the nearest atomic neighbour. The code implements a \texttt{PorosityCalculator} class which, starting from the atomic configuration and the dimensions of the simulation box, generates random points in space and verifies, for each of them, the distance from the nearest neighbour. A point is classified as “empty” when this distance exceeds the sum of the radius of the nearest atom and the given probe radius, thus allowing the global porosity of the system to be estimated. The same procedure is applied by dividing the domain into slices along z, obtaining the local porosity profile, shown in Figure \ref{fig:depo_porosity}.
+
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1\linewidth]{photos/depo_porosity.png}
+    \caption{Porosity profiles computed along the three Cartesian directions using Monte Carlo sampling. The lower axis displays the porosity variation along the x and y directions, which share the same spatial extent. The upper axis shows the porosity profile along the z direction, whose thickness differs from x and y. The dashed horizontal line represents the global porosity of the system, computed over the entire simulation volume (0.2686).}
+    \label{fig:depo_porosity}
+\end{figure}
+
+As for all previous systems, the same initial simulation workflow was applied: an NVT equilibration at 300 K followed by an NVE relaxation stage. However, due to
+the extremely high computational cost of simulating this system (composed of 232,648 atoms), the NVE production run was shortened to 20 ns. To mitigate this limitation, five independent simulations were submitted, of which only four were completed due to issues on one of the nodes. During the simulations, the substrate supporting the deposited nanofoam was modified: the thermostatted region used in the deposition phase was removed, and the substrate thickness was reduced to minimize bulk contributions to the total heat flux.
+
+It is worth noting that in LAMMPS, the heat flux cannot be computed for a subset of atoms or a specific region. This limitation arises because the heat flux expression involves virial and energy–velocity cross terms that depend on pairwise and many-body interactions extending across the entire simulation domain. Since these interaction terms cannot be cleanly restricted to a region without violating the formal definition of the microscopic heat flux, LAMMPS only provides the total system heat flux, leaving us to suppress unwanted bulk contributions.\bigskip
+
+We then performed the Green–Kubo analysis on the deposited nanoparticle system, extracting the thermal conductivity along both the x and y directions for each simulation. For each trajectory, multiple values $\kappa$ were obtained along these two axes, which were then averaged to provide a single representative value for the thermal conductivity of the system. The resulting values are:
+\[
+\kappa_{FA}=2.2789\pm0.3115\;\frac W {mk}
+\hspace{2cm}
+\kappa_F = 2.3504\pm0.1906 \; \frac W {mk}
+\]
+where we remind that the first is the mean value of multiple direct integrations of the heat flux autocorrelation function (HFACF) up until the cut-off time $\tau_{FA}$, computed by the First-Avalanche (FA) method. The second one is the mean value of different calculations of the thermal conductivity using the formula derived by Chen et al. \ref{eq:kF} in their research.\bigskip
+
+
+
+Once the thermal conductivity of the nanofilm was calculated, it was compared with that of the other small systems previously simulated (see Figure \ref{fig:all_results}). It was found to be more with that of the systems containing extended central voids. 
+
+This behaviour can be traced back to its morphology: rather than exhibiting many small, highly obstructive pores, the deposited nanofilm develops a porosity dominated by a central crater-like void (Figure \ref{fig:surface}) and few large cavities. As a consequence, the available pathways for heat transport are not excessively interrupted, or at least not as much as in systems containing spherical holes or vacancies. In fact, we arrive at a conductivity value similar to that of systems in which porosity is concentrated in larger voids rather than distributed evenly throughout the structure.
+
+It should also be noted that the nanofilm is deposited on a bulk substrate: although the substrate contributes only a small fraction of the total number of atoms (only 7.40\%), its presence slightly influences the overall thermal conductivity, providing additional conduction pathways that increase the measured value compared to a free-standing film.
+

@@ -1,0 +1,84 @@
+Buongiorno a tutti, sono Antonio Sacco e oggi vi parlerò del mio lavoro di tesi. 
+
+L’obiettivo del mio progetto è stato lo studio del contributo fononico al trasporto termico in diversi sistemi d’oro, partendo dal bulk cristallino perfetto per poi passare a sistemi via via più complessi, come gli film nanostrutturati. 
+In particolare ci siamo concentrati sull’impatto che i difetti dovuti alla porosità hanno sulla conducibilità termica. 
+Prima di entrare nel dettaglio del lavoro, vorrei spiegare perché tali sistemi meritano attenzione.
+
+Questi materiali possono essere prodotti, ad esempio, tramite la deposizione di nanoparticelle in fase gassosa tra due elettrodi. In questo modo si ottengono strutture altamente complesse e porose, come mostrato nelle figure B e C. La prima è un'immagine ricavata da un microscopio elettronico, la seconda un modellino dove si nota chiaramente l’elevato grado di porosità.
+Questi sistemi possono essere studiati con diversi modelli: possiamo considerarli come insiemi reali di nanoparticelle in contatto tra loro, oppure applicare delle maschere geometriche e descriverli come array di “pillars” tridimensionali. Dopo la deposizione si osservano altri fenomeni interessanti, come migrazioni atomiche che formano sottili ponti tra nanoparticelle adiacenti, o processi locali di ricombinazione dei difetti.
+I materiali nanostrutturati trovano applicazione in molti campi: chimica, meccanica e fisica. Grazie alla loro porosità possono essere usati come membrane per gas, sensori di fluidi e perfino componenti di batterie a idrogeno. La loro particolare interconnessione conferisce inoltre proprietà elettriche non lineari, permettendo di utilizzarli come resistori non-omici. Più recentemente, sono stati esplorati anche per applicazioni in circuiti neuromorfici per nuove architetture computazionali.
+
+L’obiettivo del nostro studio è analizzare la conducibilità termica in sistemi nanostrutturati.
+Prima di analizzare sistemi complessi, abbiamo studiato sistemi più semplici, nei quali è possibile controllare porosità e coordination number.
+
+La porosità è definita come la frazione di volume vuoto rispetto al volume totale del sistema. 
+Il coordination number (CN), invece, è il numero medio di primi vicini attorno a un atomo.
+
+I primi sistemi considerati sono questi 4:
+Bulk perfetto, utilizzato come riferimento. All’interno del bulk abbiamo introdotto la porosità in 3 diversi modi:
+- Vuoto centrale di raggio variabile.
+- Buchi sferici randomicamente posizionati, in numero e raggio variabile.
+- Rimozione casuale di atomi, generando vacanze in numero variabile.
+Nelle figure, il colore rappresenta il coordination number: colori scuri indicano CN più bassi dovuti alla presenza di vuoti.
+
+Successivamente abbiamo analizzato architetture più complesse, come gli assemblati nanostrutturati.
+Sono divisi in due famiglie:
+- I nanopillars: assemblati di tre nanoparticelle di tipologia diversa, inserite tra due ritagli di bulk.
+- I nanofilms: depositi di nanoparticelle, di cui abbiamo considerato un solo esempio in figura.
+
+Successivamente abbiamo analizzato architetture più complesse, come gli assemblati nanostrutturati.
+Sono divisi in due famiglie:
+- I nanopillars: assemblati di tre nanoparticelle di tipologia diversa, inserite tra due ritagli di bulk.
+- I nanofilms: depositi di nanoparticelle, di cui abbiamo considerato un solo esempio in figura.
+
+Per calcolare la conducibilità termica di tutti questi sistemi, abbiamo sviluppato un workflow completo composto da tre fasi.
+Costruzione dei sistemi utilizzando ASE, Atomic Simulation Environment, una libreria Python che permette di costruire e manipolare sistemi atomici. 
+      Con ASE calcoliamo anche quantità strutturali come il coordination number e la porosità.
+2. Simulazioni di dinamica molecolare di equilibrio compiute con LAMMPS, simulatore di CMD che va ad integrare l’equazione di Newton.
+Le simulazioni vengono eseguite con LAMMPS e sono suddivise in tre fasi: 
+- Termalizzazione alla temperatura target di 300 K.
+- Equilibrazione, per eliminare effetti transitori legati all’applicazione del termostato.
+- Produzione, dove registriamo tutte le grandezze necessarie al calcolo della conducibilità termice.
+In particolare, il flusso termico viene calcolato in LAMMPS come la differenza del contributo convettivo (energia tot per atomo per velocità) e del contributo meccanico (stress per  velocità).
+3. Post-processing in Python dove calcoliamo la conducibilità termica tramite il metodo di Green–Kubo, che lega conducibilità termica (coefficiente macroscopico) con l’integrale temporale dell’autocorrelazione del flusso termico (quantità microscopica) con costante moltiplicativa V/kb T^2. Qui risiede il contributo più distintivo del lavoro: l’applicazione di questo metodo in sistemi che non presentano perfetta isotropia né piena periodicità, condizioni per cui il metodo è tradizionalmente applicato. Calcoliamo la funzione di autocorrelazione del flusso termico (HFACF) e scegliamo un tempo di cutoff per evitare l’integrazione di code rumorose. Integriamo l’HFACF ottenendo così la conducibilità termica.
+Andando ad applicare il workflow a tutti i sistemi elencati precedentemente otteniamo i corrispondenti valori di conducibilità termica.
+
+Andando a vedere come la conducibilità termica varia in funzione della porosità otteniamo questo grafico:
+(dove non troviamo i pillars per cui porosità non è definita)
+Per tutti i sistemi sserviamo un andamento comune:
+- all’aumentare della porosità, la conducibilità termica diminuisce;
+- tuttavia, a parità di porosità, la conducibilità può essere molto diversa a seconda del tipo di difetto.
+In particolare:
+- la diminuzione è maggiore nei sistemi con vacanze,
+- intermedia per i buchi sferici random,
+- minore per il vuoto centrale.
+
+Se andiamo a guardare il valore della conducibilità ottenuto per il nanofilm risulta coerente con quello dei sistemi con grande vuoto centrale, in accordo con la morfologia del sistema, dominata da una cavità ampia.
+
+I sistemi nanopillars mostrano una stabilità strutturale inferiore rispetto ai precedenti. 
+Andando a vedere come vatia il coordination number medio nel tempo, vediamo che questi sistemi sono caratterizzati da momenti di stabilità alternati a ricombinazioni atomiche.
+Sono stati considerati 6 sistemi: blu – verde ritagli di bulk (parallepipedo - colonna cilindrica) mentre gli altri sono gli assemblati di nanoparticelle.
+
+Applicando il workflow anche a questi sistemi, notiamo che:
+- i ritagli di bulk hanno una conducibilità termica superiore rispetto agli assemblati di nanoparticelle;
+- questo non sembra dipendere dal coordination number, che è simile per tutti i sistemi, bensì dalla continuità della sezione trasversale, che nei pillar assemblati è più irregolare limitando il moto dei fononi.
+
+Infine, rappresentando la conducibilità in funzione del deficit di coordination number (rispetto al valore bulk pari a 12), otteniamo il seguente grafico: 
+mano che il coordination number diminuisce, la conducibilità termica decresce, con un andamento unico per tutti i sistemi e ben descritto da un fit esponenziale.
+
+Riassumendo, l’obbiettivo di questo lavoro era studiare il contributo fononico alla conducibilità termica di diversi sistemi d’oro, concentrandosi, in particolare, su come i difetti dovuti alla porosità vanno ad influenzare la conducibilità termica. 
+Per farlo abbiamo sviluppato un completo workflow che parte dalla costruzione dei sistemi, passa per la loro simulazione di dinamica molecolare di equilibrio, e finisce con il calcolodei descrittori geometrici e della conducibilità termica con il metodo di green-kubo.
+I risultati ottenuti sono:
+- La conducibilità termica diminuisce con l’aumentare della porosità.
+- Tuttavia, la sola porosità non è sufficiente a prevedere la conducibilità: sistemi con uguale porosità possono avere valori molto diversi.
+- Il coordination number medio descrive in modo migliore e più universale il comportamento della conducibilità e include anche quei sistemi per cui porosità non è definita
+- Al diminuire del coordination number, la conducibilità termica diminuisce in modo coerente per tutti i sistemi studiati.
+Possiamo quindi affermare che il coordination number domina il contributo fononico al trasporto termico nei sistemi d’oro.
+
+Possibili estensioni di questo lavoro includono:
+- studiare l’effetto di altri difetti: impurità, dislocazioni, difetti planari, bordi di grano;
+- esplorare criteri più robusti per determinare il tempo di cutoff nel metodo Green–Kubo;
+- confrontare i risultati con simulazioni di dinamica molecolare non di equilibrio, imponendo gradienti di temperatura;
+- utilizzare potenziali di machine learning, che descrivono meglio le interazioni atomiche, per ottenere stime più precise del flusso termico.
+
+Con questo ho concluso. Grazie per l’attenzione.

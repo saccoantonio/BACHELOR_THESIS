@@ -1,0 +1,12 @@
+\chapter*{Abstract}
+
+Understanding thermal transport in metallic nanosystems is crucial for designing nanoscale devices, where reduced size, morphological defects, including porosity, lack of periodicity strongly affect phonon propagation. While gold has well-known thermal conductivity in the bulk, Au-nanostructures exhibit more complex behaviour. 
+This thesis investigates how thermal conductivity varies in Au systems varying their porosity and defect types, from bulk to nanopillars and deposited nanofilms.
+
+We quantify the thermal transport employing equilibrium molecular dynamics (EMD) simulations performed with LAMMPS, coupled with the Green–Kubo (GK) formalism. Interactions between gold atoms are described using an embedded-atom method (EAM) potential. To carry out the full analysis, we develop a workflow composed of three main stages: (i) Atomic structures are generated using the ASE Python library. (ii) EMD simulations, as in LAMMPS, are run  to obtain the heat flux and the relevant dynamical information. (iii) Analysis of  the heat flux autocorrelation function (HFACF), computation of the Green–Kubo integrals, and extraction of structural descriptors such as the average coordination number (aCN) and the porosity (my Python code).
+
+The results show a consistent trend across all configurations: thermal conductivity decreases monotonically increasing porosity. Vacancy systems exhibit the strongest reduction if a uniform distribution of point defects occurs, while voids and hole-based structures preserve larger continuous regions that facilitate heat transport. Pillars carved from bulk crystals maintain relatively higher conductivity than pillars assembled from nanoparticles, the latter considerably smaller. The deposited film studied in this work, despite its complex morphologies, returns conductivity values similar to those of systems with a single central void.
+
+Thermal conductivity correlates with the mean coordination number. Low coordination, associated with an increased disorder and number of defects, implies a low conductivity. Conversely, higher coordination promotes better atomic connectivity and more efficient phonon transport. 
+
+Overall, this work demonstrates the robustness of GK-based thermal transport calculations in both ideal and highly disordered systems and provides insight into how low vs high  mean coordination number governs the phononic contribution to heat conduction in gold.

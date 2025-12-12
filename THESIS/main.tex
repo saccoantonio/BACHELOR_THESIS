@@ -1,0 +1,35 @@
+\documentclass[twoside]{book}
+
+\input{packeges}
+
+\begin{document} % -<0>-=v^v=--<0>--=v^v=--<0>-
+
+\frontmatter % numeri romani 
+
+    \begingroup
+    \thispagestyle{empty}
+    \include{chapters/titlepage}
+    \endgroup
+    
+    \newpage
+    \thispagestyle{empty}
+    \null
+    \newpage
+    
+    \setcounter{page}{1} % riparte la numerazione da i 
+    
+    \newpage
+    \include{chapters/0abstract.tex}
+    
+    \tableofcontents
+    
+\mainmatter % numeri arabi
+    \include{chapters/1intro.tex}
+    \include{chapters/2md.tex}
+    \include{chapters/3mywork.tex}
+    \include{chapters/4conclusions.tex}
+
+\backmatter
+    \printbibliography
+
+\end{document}

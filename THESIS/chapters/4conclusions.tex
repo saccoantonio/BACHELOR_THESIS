@@ -1,0 +1,79 @@
+\chapter{Discussion and Conclusions} \label{chap:conc}
+
+Over the course of this thesis, I acquired a set of technical and methodological skills covering the entire workflow of atomistic simulations. I learned how to set up and run molecular dynamics simulations in LAMMPS, how to construct and manipulate atomic configurations using ASE, and how to visualise structural and dynamical properties in OVITO. I gained confidence in writing input scripts, interpreting log and dump files, and implementing post-processing routines. On the analysis side, I learned to handle simulation data using Python, in particular with \texttt{NumPy} and \texttt{Pandas}, to compute statistical quantities such as coordination numbers, autocorrelation functions, and Green–Kubo integrals, and to present the outcomes through plots. Altogether, these tools helped me to create a complete approach for exploring thermal transport in different nanostructured systems, which, for reproducibility purposes, is publicly available in the post-processing section of my GitHub repository \cite{saccoantonio2025thesis}.\bigskip
+
+\section{Comparing thermal conductivity in Au-nanosystems}
+From a scientific perspective, the main results of this thesis work are summarised in Figures \ref{fig:all_results} and \ref{fig:k_vs_cn}. These figures report the thermal conductivity of Au systems as a function of porosity and average coordination number, respectively, and demonstrate how different defect morphologies, such as vacancies, voids, spherical holes carved from the bulk, and nanoparticle assemblies (pillars and films), affect the thermal conductivity of metallic systems.\bigskip
+
+Figure \ref{fig:all_results} compares the thermal conductivity of the different systems as a function of the porosity, excluding the nanopillar systems for which porosity is not well defined. We observe a consistent trend across all configurations: as porosity increases, the thermal conductivity decreases. 
+
+In bulk with introduced vacancies, the decrease is especially pronounced, as conductivity declines swiftly even with modest defect concentrations, more significantly than in void or hole configurations that have similar porosity. This is likely related to the way vacancies were introduced: by removing atoms at random positions, the defects become more uniformly distributed throughout the bulk. For a fixed porosity, this widespread distribution disrupts a larger number of atomic connections, effectively reducing the available pathways for heat transport. By contrast, for hole configurations, the porosity is more localised, and in the void case, it is concentrated in a single central cavity. Therefore, these geometries leave relatively large ``perfect'' regions of bulk material, which preserve more continuous pathways for thermal conduction.
+
+Such behaviour is confirmed by the analysis carried out for the holes system, where the porosity is fixed but we vary the radius of the holes. We observe that as the size of the holes increased, the conductivity also increased (Figure \ref{fig:holesfixedn_results}), likely because for the same porosity, there are fewer and larger holes, leaving more continuous pathways for heat transport through the material.
+
+\begin{figure}[H]
+    \centering    \includegraphics[width=1\linewidth]{photos/all_results.jpg}
+    \caption{Thermal conductivity as a function of porosity for the bulk, vacancies, holes, and void systems. All configurations display a monotonic decrease in conductivity with increasing porosity. The vacancies systems show the steepest reduction, followed by the holes and then the void systems. The nanofilm, in light blue, shows a conductivity similar to the last void systems, despite having three times the porosity.}
+    \label{fig:all_results}
+\end{figure}
+
+In this thesis, I have shown that it is possible to extend the Green-Kubo method and extract meaningful results even for non-standard systems, which may not be perfectly equilibrated or ideally suited for their typical applications. Pillar-like systems offered a particular behaviour: as shown in figure \ref{fig:pillar_results}, structures carved directly from the bulk retained relatively high thermal conductivity thanks to their continuous atomic layers, whereas nanopillars assembled from individual Au clusters \cite{TiberiBaletto2024} exhibited significantly lower values due to irregular cross-sectional areas and inhomogeneities.\bigskip
+
+Considering larger systems, such as nanofoams containing numerous defects, voids, and pores, it was possible to obtain meaningful thermal conductivity estimates using the GK approach: 
+\[
+\kappa_{FA}=2.2789\pm0.3115\;\frac W {mk}
+\hspace{2cm}
+\kappa_F = 2.3504\pm0.1906 \; \frac W {mk}
+\]
+Interestingly, the deposited nanofilm considered in this work (Figure \ref{fig:depo}) exhibits a conductivity similar to systems with large voids, which can be attributed to its morphology: rather than many small, obstructive pores, it has a central crater-like void and few large cavities, leaving relatively uninterrupted pathways for heat transport. However, to more accurately model these complex structures, one should also account for the presence of dislocations and other types of defects, which were not explored in this thesis. These additional structural imperfections could further influence phonon transport and lead to variations in thermal conductivity beyond those captured in the present study.\bigskip
+
+Thermal conductivity was also analysed for all systems by plotting it against the coordination deficit $\Delta\text{aCN}=12-\text{aCN}$, which represents the deviation from the bulk value (aCN=12). Since the mean coordination number is experimentally measurable \cite{Beale_2010}, this choice offers a useful connection to real measurements. Figure \ref{fig:k_vs_cn} reveals a consistent trend: increasing disorder and defect density, reflected in larger coordination deficits, generally leads to a reduction in thermal conductivity. The data appear to follow a ``law'', suggesting that in periodic systems with defects, the thermal conductivity can be tuned and controlled through the average coordination number. 
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1\linewidth]{photos/k_vs_cn_fit.jpg}
+    \caption{Thermal conductivity as a function of $\Delta \text{aCN}$, for all investigated systems. Two types of hole-containing systems are shown: (a) fixed radius with varying porosity, and (b) fixed porosity with varying hole radius. The dashed line represents an exponential fit $\kappa_{\mathrm{FA}} = a \, e^{-b \, (\Delta \text{aCN})} + c$ to the data, with fitted parameters $a = 5.329$, $b = 5.055$, and $c = 0.850$.
+}
+    \label{fig:k_vs_cn}
+\end{figure}
+
+The observed decrease in thermal conductivity with decreasing coordination number is not surprising. 
+A lower coordination number suggests a reduced atomic coordination in these structures, associated with more distortions, voids, defects, or local disorder, which tend to interrupt phonon propagation, thereby reducing heat transport efficiency. Conversely, structures with higher coordination feature more neighbours per atom, promoting greater connectivity in the atomic network and providing more continuous pathways for phonons to propagate with less scattering. As a result, the coordination number emerges as a simple but effective descriptor of the local structural state, summarising the degree to which the atomic arrangement is ordered, compact, and well-connected, and highlighting its critical role in determining phonon-mediated thermal conductivity. \bigskip
+
+Overall, this thesis highlights both the versatility and the applicability of GK–based thermal transport calculations when extended beyond ideal crystalline materials. It shows that atomistic morphology, focusing on porosity, plays a central role in shaping thermal conductivity, especially in nano-engineered structures where coordination, local ordering, and cross-sectional geometry can deviate substantially from the bulk. These results demonstrate that meaningful and physically consistent estimates of thermal conductivity can be obtained even when departing from the strict equilibrium molecular dynamics assumptions (see Section \ref{subsec:EMD}). Such insights can be helpful to better understand and design nanostructured metals with tuned thermal properties.
+
+\section{Morphological stability of the considered systems}
+
+To strengthen the conclusions presented in Figures \ref{fig:all_results} and \ref{fig:k_vs_cn}, we verified that the morphology of all considered Au systems remains stable over the simulation timescale. 
+For systems constructed directly from bulk FCC gold, vacancies, voids, and spherical holes the porosity and the average coordination number (aCN) remain essentially constant throughout the dynamics, as shown in Figure \ref{fig:aCNt}. 
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1\linewidth]{photos/aCNt.png}
+    \caption{Time evolution of the average coordination number (aCN) for all investigated systems. Each panel reports the behaviour of a distinct structural class, using the following naming convention to label the simulated systems: central voids (VOID + void radius in \AA), vacancy configurations (VACANCIES + number of removed atoms), spherical holes of type (a) (HOLES + number of removed atoms) and type (b) (HOLES + hole radius), pillars (name), and the nanofilm (DEPOSITION + seed of the simulation). }
+    \label{fig:aCNt}
+\end{figure}
+
+A different scenario emerges for pillar-like systems. These structures are assembled starting from aggregated nanoparticles, which are highly under-coordinated and characterised by irregular surfaces. As a consequence, they undergo more frequent surface rearrangements and partial reconstructions during the the simulation. This leads to a progressive increase in their aCN, reflecting the system’s tendency to minimise surface energy by forming additional bonds. Such behaviour is consistent with previous observations of nanopillar reconstruction reported in \cite{TiberiBaletto2024}.\bigskip
+
+Similar behaviour, to a lesser extent, can be observed in the configuration of the nanofilm. Since this system is generated via a deposition process, the initial structure contains undercoordinated atoms and local surface irregularities. During the simulation, post-deposition rearrangements continue to occur, leading to partial surface reconstruction and a progressive increase in the aCN.
+
+
+\section{Future Developments}
+The present work provides a solid foundation for understanding thermal transport in nanoporous gold; however, methodological choices could be refined and made more precise.\bigskip
+
+A more robust determination of the Green–Kubo integration cut-off is required. A source of uncertainty lies in the determination of the Green–Kubo integration cut-off time, $\tau_{\text{cut-off}}$. In my thesis, this is achieved using the First Avalanche method conceived by Chen et al. \cite{Chen2013ImproveAccuracyEMD}. However, other approaches are available. For example, in de Sousa Oliveira and Greaney's work \cite{OliveiraGreaney2017}, they provide a meticulous and automated choice of $\tau_{\text{cut-off}}$, which can separate the physically meaningful slow relaxation processes and pure statistical noise from the long-time tail of the HFACF. They found that, when integrated, this noise behaves as a random walk, generating an uncertainty that grows with time. Their method quantifies the integrated noise and determines the optimal cut-off as the point that best balances systematic truncation error with the noise accumulation. Implementing such techniques would offer a more rigorous and automated procedure for identifying $\tau_{\text{cut-off}}$, significantly reducing the variability of the computed thermal conductivities.\bigskip
+
+
+Another possible improvement involves increasing the structural variety explored with the Green–Kubo method. My work focuses on porosity-driven disorder. Other microscopic features affect thermal conductivity, like, for example, interstitial or impurity atoms, grain boundaries, or dislocations — already present inside nanofoams — and could be similarly investigated. (Figure \ref{fig:defects}). Future simulations on these systems could quantify how each defect type, individually or in combination, modifies the heat flux correlation and influences the conductivity of the system.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1\linewidth]{photos/defects.png}
+    \caption{Schematic illustration of some crystal defects not considered in this work: (a) interstitial atom, (b) impurity atom, (c) dislocation, (d) grain boundary \cite{Manini2020}.}
+    \label{fig:defects}
+\end{figure}
+
+Additionally, valuable insight could be gained from a comparison with direct non-equilibrium methods. The application of non-equilibrium molecular dynamics (NEMD) simulations, such as Müller-Plathe or imposed heat flux \cite{tenenbaum1982, demin2019}, to the same nanostructures would offer an additional criterion, clarifying consistencies or limitations of the GK approach, in systems that deviate strongly from bulk symmetry. 
+
+One might also consider combining EMD (or NEMD) methods with machine-learning interatomic potentials. Examples of these potentials, including GAP, SNAP, MACE, or our ML-FFs \cite{AlimontiBalettoMLIAPs}, represent a recent advance in atomistic simulations. Their ability to reproduce highly non-linear interactions, with near ab-initio accuracy across extended time and length scales \cite{jmi.2025.17}, makes them particularly attractive for studying systems far from the ideal bulk crystal \cite{Freitas2022}. In configurations featuring strong disorder, like the ones explored in this thesis, classical potentials like EAM or MEAM often fail to capture subtle energy landscapes \cite{WenDevelopment19}, anharmonic responses \cite{Zella2024}, or the correct local force distributions \cite{Allera2025ActivationEntropy}. Employing ML-based potentials in future work could therefore improve the accuracy of heat-flux calculations.

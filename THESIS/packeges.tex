@@ -1,0 +1,112 @@
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[english]{babel}
+\usepackage{microtype}
+
+\usepackage[a4paper, margin=2.5cm]{geometry}
+\setlength{\parindent}{0pt}
+\linespread{1.1}
+\raggedbottom
+
+\usepackage{enumitem}
+\setlist[enumerate]{
+    itemsep=1ex,
+    topsep=0.5ex,
+    parsep=0pt,
+    partopsep=0pt,
+    left=0.5em,
+    labelsep=0.5em
+}
+\setlist[itemize]{
+    itemsep=1ex,
+    topsep=0.5ex,
+    parsep=0pt,
+    partopsep=0pt,
+    left=0.5em,
+    labelsep=0.5em
+}
+
+\usepackage{lmodern}
+
+\usepackage{amsmath, amssymb, amsthm, mathtools}
+\usepackage{bm}
+\usepackage{physics}
+\usepackage{siunitx}
+\usepackage{cancel}
+\usepackage{mathrsfs}
+\usepackage{tikz-cd}
+\usepackage{tensor}
+
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{subcaption}
+\usepackage{booktabs}
+\usepackage{mdframed}
+\usepackage{tikz}
+\usetikzlibrary{calc, arrows.meta, decorations.pathmorphing}
+\usepackage[table]{xcolor}
+
+\usepackage{xcolor}
+\definecolor{linkblue}{HTML}{1A4E8A}
+\usepackage[
+  colorlinks=true,
+  linkcolor=linkblack,
+  citecolor=linkblack,
+  urlcolor=linkblack
+]{hyperref}
+
+\usepackage[font=small, labelfont=bf]{caption}
+
+\usepackage[explicit]{titlesec}
+\titleformat{\section}[block]
+  {\bfseries\LARGE}
+  {\thesection}{1em}{#1}
+\titleformat{\subsection}[block]
+  {\bfseries\Large}
+  {\thesubsection}{1em}{#1}
+
+
+\usepackage[backend=biber, style=numeric, sorting=none]{biblatex}
+\addbibresource{chapters/bibliography.bib}
+
+\usepackage{fancyhdr}
+\setlength{\headheight}{14pt}
+\pagestyle{fancy}
+\fancyhf{} % clear all fields
+
+\makeatletter
+\renewcommand{\chaptermark}[1]{%
+  \markboth{Chapter \thechapter\ — #1}{}%
+}
+\renewcommand{\sectionmark}[1]{%
+  \markright{Section \thesection\ — #1}%
+}
+\makeatother
+
+\fancyhead[LE]{\slshape\nouppercase{\leftmark}}  % Chapter a sinistra su pagine pari
+\fancyhead[RO]{\slshape\nouppercase{\rightmark}} % Section a destra su pagine dispari
+\fancyfoot[LE,RO]{%
+  \tikz[baseline={(0,0)},anchor=center] \node[label={center:\thepage}]{};%
+}
+
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\footrulewidth}{0.4pt}
+\newcommand \GB [1] {\bgroup\noindent[\textcolor{olive}{\textbf{GB}: #1}]\egroup\ignorespacesafterend}
+
+\fancypagestyle{plain}{
+  \fancyhf{} % pulisce intestazioni e piè di pagina
+  % Mantieni solo il fancyfoot come nel resto
+  \fancyfoot[LE,RO]{%
+    \tikz[baseline={(0,0)},anchor=center] \node[label={center:\thepage}]{};%
+  }
+  % Niente header (rimuove la linea in alto)
+  \renewcommand{\headrulewidth}{0pt}
+  % Mantieni la linea nel footer, se vuoi
+  \renewcommand{\footrulewidth}{0.4pt}
+}
+
+\makeatletter
+\renewcommand\normalsize{%
+   \@setfontsize\normalsize{13pt}{15.6pt}%
+}
+\makeatother

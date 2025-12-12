@@ -1,0 +1,424 @@
+\chapter{Computer Simulations} \label{chap:md}
+In recent decades, computer experiments have acquired a central role in many areas of physics, chemistry, and materials engineering. Their strength lies in the ability to bridge the gap between theory and experiment by transforming theoretical predictions into quantitative results that can be directly compared with experimental data, allowing each to inform and refine the other. 
+
+Simulations act as a 'numerical laboratory' in which theoretical predictions can be tested, and when exact theories fail, they can reveal which approximations hold, helping physicists develop new models. At the same time, simulations can replicate laboratory experiments, allowing for direct comparison of results and a better understanding of behaviours that may be difficult to observe experimentally, such as the individual motions of atoms or molecules. Finally, simulations allow us to study systems under extreme conditions, which are both very hard to model theoretically and difficult to access experimentally.\\
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{photos/SIM-TEO-EXP_v2.png}
+    \caption{The role of computer simulations in material discovery.}
+    \label{fig:md_algorithm}
+\end{figure}
+
+There are many types of simulation, but among them, two stand out as the most effective for modelling systems of many interacting particles, both grounded in fundamental principles of statistical mechanics: Molecular Dynamics (MD) and Monte Carlo (MC). 
+Their widespread adoption stems from their ability to handle systems with a large number of degrees of freedom, capturing both microscopic interactions and emergent macroscopic properties. While both aim to explore the behaviour of many-particle systems, they differ fundamentally in their approach: Molecular Dynamics follows deterministic trajectories obtained by integrating Newton’s equations of motion, whereas Monte Carlo relies on stochastic sampling to generate representative configurations according to statistical ensembles.\\
+
+In the context of this work, the focus will be primarily on Molecular Dynamics, due to its ability to reproduce the time evolution of atomic and molecular systems with high fidelity. This makes it particularly well-suited for investigating transport properties, like thermal conductivity. The method provides direct access to trajectories in both real and phase space, from which thermodynamic quantities can be computed and microscopic mechanisms analysed in detail. To perform the simulations presented in this study, the open-source molecular dynamics package LAMMPS was employed, offering a flexible framework for implementing a variety of interatomic potentials, boundary conditions, and statistical ensembles.
+
+
+\section{Molecular Dynamics}
+Molecular Dynamics (MD) is a powerful simulation technique which allows the study of complex many-body systems at the atomic and molecular scale. This approach is based on the numerical integration of Newton’s equations of motion for a set of interacting particles. Each particle experiences forces derived from an interatomic potential, which can take different forms, ranging from simple two-body interactions to more sophisticated many-body descriptions, and can also express classical approximations of the underlying quantum mechanical interactions. \\
+
+Molecular Dynamics was developed during the late 1950s and early 1960s, with the initial computer simulations of particle interactions. A significant achievement was the research conducted by Alder and Wainwright in 1957 at Lawrence Livermore National Laboratory, who utilised hard-sphere models to investigate phase transitions \cite{Alder1957}. This was followed by Rahman's groundbreaking simulation of liquid argon in 1964, which showcased the capabilities of molecular dynamics for realistic modelling of condensed matter systems \cite{Rahman1964}. During the 1970s and 1980s, the introduction of more precise interatomic potentials and improvements in numerical algorithms enhanced the usefulness of MD for studying biomolecules, polymers, and complex fluids. The recent increase in computational capability has allowed molecular dynamics to evolve into an even more reliable technique, enabling the simulation of highly complex systems with millions of atoms over timescales, ranging from nanoseconds to microseconds.\\
+
+Therefore, by tracking the instantaneous positions of the particles, MD becomes a powerful tool for investigating the microscopic behaviour of matter and, through the computation of ensemble averages, for establishing its connection with macroscopic thermodynamic properties such as temperature, pressure, diffusion coefficients, and thermal conductivity. To fully understand its capabilities, it is important to investigate more thoroughly how it functions and what key characteristics a reliable MD algorithm should include.
+
+
+\section{MD Algorithms}
+The best way to introduce Molecular Dynamics is to consider a simple program, which shows what are the key points of this kind of simulation. The program is built as follows:
+
+\begin{enumerate}
+    \item We input the parameters specifying the simulation conditions, like the number of particles, time step, temperature, etc. They play an important role in the simulation and strongly influence its accuracy and efficiency.
+    \item We set the initial position and velocity of each particle; this step is called initialisation.
+    \item We compute the forces acting on all particles.
+    \item We integrate Newton's equation of motion. These and the previous steps are the core of the algorithm, and they are repeated until we have evolved our system for the desired length of time.
+    \item We compute the averages of measured quantities and stop the simulation.
+\end{enumerate}
+
+\begin{figure}[H] % [H] forza la posizione qui, serve il package float
+    \centering
+    \includegraphics[width=0.7\textwidth]{photos/md_algorithm.png}
+    \caption{Schematic representation of a typical MD algorithm \cite{frenkel_smit}.}
+    \label{fig:md_algorithm}
+\end{figure}
+
+ This short pseudo-algorithm, shown in Figure \ref{fig:md_algorithm}, is able to carry out a Molecular Dynamics simulation for a simple atomic system, but it contains all the crucial points that every MD script should have, even the more sophisticated ones.  
+
+\subsection{Initialization}
+The initialisation phase represents the starting point of any Molecular Dynamics simulation. In this step, initial positions and velocities must be assigned to all particles in the system, in a way that reflects the structure we intend to simulate (Figure \ref{fig:pos_init}). Positions in particular must be chosen avoiding unrealistic overlaps between atomic or molecular cores. Proper initialisation ensures that the system begins its evolution from a physically meaningful configuration, preventing instabilities and unphysical results during the dynamics. 
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.7\textwidth]{photos/pos_init.png}
+    \caption{Typical MD initial structures: crystal lattice, amorphous arrangement, and biomolecule (biomolecule of the month, November 2025 \cite{pdb, Berman2000PDB})}
+    \label{fig:pos_init}
+\end{figure}
+
+Another crucial aspect to consider during initialisation is the treatment of the system boundaries. In Molecular Dynamics simulations, it is common to employ periodic boundary conditions (PBC) to mimic an effectively infinite system and avoid surface effects. As shown in Figure \ref{fig:pbc}, with PBC, particles that move out of one side of the simulation box re-enter from the opposite side, ensuring that the density and structure of the system remain consistent. 
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1\linewidth]{photos/pbc.png}
+    \caption{Periodic Boundary Conditions (PBC), example in two dimensions. The darker region is the simulation box, while the surrounding squares are the periodically repeated images. The arrows identify an atom crossing through a boundary and re-entering the box on the opposite side.}
+    \label{fig:pbc}
+\end{figure}
+
+Once the particle positions are defined, it's time to assign the initial velocities. This is typically done according to the Maxwell–Boltzmann distribution at the desired simulation temperature. This ensures that the system’s kinetic energy is consistent with the target thermodynamic conditions predicted by statistical mechanics.
+
+As another option, one can initialise all particle velocities to zero and slowly adjust the system to the desired temperature using a thermostat. This method, commonly referred to as thermalisation or equilibration, enables the system to achieve a realistic distribution of kinetic energy without causing significant initial forces that may destabilise the simulation. Gradually raising the temperature promotes a gentle transition from the starting configuration and minimises the potential for numerical instabilities, particularly in dense or highly interactive systems.
+
+
+\subsection{The Force Calculation}
+What comes next is the most time-consuming part of the typical Molecular Dynamics algorithm: computing all the forces acting upon each particle. The forces are derived from an interatomic potential, which defines how particles interact with each other. Depending on the system under study, these potentials can range from simple pairwise interactions, such as the Lennard–Jones potential \cite{jones1924}, to more sophisticated many-body formulations like the Embedded Atom Method (EAM) \cite{daw1984eam} or reactive force fields (ReaxFF) \cite{vanduin2001}. The accuracy of a Molecular Dynamics simulation strongly depends on the choice of the potential. A well-chosen potential captures the essential physics of the material, while a poor choice can lead to unrealistic results.\\
+
+In this study, the interactions among gold atoms are simulated using the Embedded Atom Method (EAM), a many-body potential that has been specifically designed for metallic systems \cite{foiles1986eamfcc}. Unlike basic pairwise models, which rely solely on the separation between two atoms, EAM considers that an atom's energy in a metal is influenced not only by its pairwise interactions but also by the local electron density generated by its neighbours. This characteristic makes EAM particularly effective for accurately capturing the cohesive properties, elastic behaviour of conductive metals like gold. 
+The total potential energy of the system is expressed as
+
+\begin{equation}
+PE_{\text{tot}} = \sum_{i} F\!\left(\rho_i\right) + \frac{1}{2}\sum_{i \neq j} \phi(r_{ij})
+\end{equation}
+
+ where:
+\begin{itemize}
+    \item $F(\rho_i)$ is the \textit{embedding energy}, i.e. the energy cost to embed atom $i$ into the local electron density $\rho_i$,
+    \item $\rho_i = \sum_{j \neq i} f(r_{ij})$ is the \textit{host electron density} at the position of atom $i$, obtained as a superposition of atomic electron density contributions $f(r_{ij})$ from neighbouring atoms,
+    \item $\phi(r_{ij})$ is a \textit{pairwise potential} describing electrostatic and repulsive core interactions,
+    \item $r_{ij}$ is the distance between atoms $i$ and $j$.
+\end{itemize}
+
+The \textit{force} on atom $i$ is then derived from the negative gradient of the total energy:
+
+\begin{equation}
+\mathbf{F}_i = - \nabla_{\mathbf{r}_i} PE_{\text{tot}}= - \sum_{j \neq i} \left[ F'(\rho_i)\, f'(r_{ij}) + F'(\rho_j)\, f'(r_{ij}) + \phi'(r_{ij}) \right] \hat{\mathbf{r}}_{ij}
+\end{equation}
+
+where $\hat{\mathbf{r}}_{ij} = \frac{\mathbf{r}_i - \mathbf{r}_j}{r_{ij}}$ is the unit vector along the $i-j$ direction, and primes denote derivatives with respect to the argument.\\
+
+This formulation highlights the many-body nature of the EAM: the force on each atom depends not only on its pairwise interactions but also on the electron density contributions from the entire neighbourhood.\\
+
+Given that the determination of forces needs to be performed at each integration step, the efficiency of this process greatly influences the overall practicality of a molecular dynamics simulation. Thus, let’s examine the computational expense related to force evaluation. 
+
+If we consider a model system with pairwise additive interactions, we have to consider the contribution to the force on particle $i$ due to all its neighbours, keeping in mind PBCs. If we consider only the interaction between a particle and the nearest image of another particle, this implies that, for a system of $N$ particles, we must evaluate $N \times (N-1)/2$ pair distances.
+This implies that, if we use no tricks, the time needed for the evaluation of the forces scales as $N^2$. And since in EAM, in addition to the pairwise interactions, it is necessary to calculate and sum the electron density induced by all the neighbours of each atom, the time scaling is still $N^2$ but the prefactor is larger than for a simple two-body potential like Lennard-Jones, because the per-particle calculations are more complex. \\
+
+To reduce the computational cost, it is common to introduce a cut-off radius, $r_\text{cut}$, beyond which interactions are neglected. This reduces the number of pair distances that need to be evaluated for each atom, effectively lowering the scaling from $O(N^2)$ to approximately $O(N)$ for short-range potentials \cite{rapaport2004}.
+Furthermore, the use of neighbour lists allows us to keep track of only those particles within the cut-off distance for each atom, avoiding unnecessary distance calculations at every time step. 
+
+These techniques are essential for making large-scale molecular dynamics simulations feasible, especially when dealing with many-body potentials like EAM; however, it is important to note that introducing a cut-off and using approximations introduces small errors in the force evaluation. Therefore, there is always a trade-off between computational efficiency and accuracy, and the choice of cut-off radius or other approximations must balance performance with the level of precision required.\\
+
+
+\subsection{Integrating the Equation of Motion}
+Now that all forces between the particles are computed, it's time to integrate Newton's equation of motion to update particle positions and velocities. The integration of the equations of motion is done at each time step to move the system from its current configuration to the next. 
+
+Firstly, the choice of the time step $\Delta t$ is crucial: it must be small enough to accurately show the fastest motions in the system, while large enough to allow the simulation to reach meaningful timescales in a reasonable computational time.
+
+Secondly, to achieve an effective simulation, an appropriate integration algorithm needs to be selected. Before discussing what are the most utilised methods, it's better to understand what makes a good integration algorithm. Contrary to what someone might think, speed is less critical (since force calculations dominate computational cost), while accuracy at larger time steps is highly important: the longer the time step an algorithm allows without losing stability, the fewer force evaluations are needed. Such algorithms achieve this by storing higher-order derivatives of particle coordinates. Ideally, the perfect algorithm should be able to predict particle trajectories accurately over both short and long times. However, due to Lyapunov instability, small differences between the exact trajectory and the simulated one grow exponentially over time, making precise long-term trajectory prediction impossible. This, however, does not seriously compromise the usefulness of MD simulations, as statistical properties remain meaningful. 
+
+Energy conservation is another key feature. High-order algorithms often conserve energy very well over short times but can exhibit energy drift in the long-term, whereas simpler algorithms may be less accurate short-term but maintain much better long-term energy stability. Thus, a good integration algorithm balances the ability to use reasonably large time steps, stable energy behaviour, and numerical simplicity. \\
+
+One of the most widely used integration algorithms that combines computational efficiency, numerical stability, and energy conservation is the Verlet algorithm \cite{Verlet1967}. It can be easily obtained from the Taylor expansion of the coordinate of a particle around time $t$: 
+\begin{equation}
+\begin{split}
+    r(t+\Delta t) = r(t) + v(t) \Delta t + \frac{1}{2}a(t)\Delta t^2 + \frac{\Delta t^3}{3!} \dot a(t)+ \mathcal{O}(\Delta t^4) \\
+    r(t-\Delta t) = r(t) - v(t) \Delta t + \frac{1}{2}a(t)\Delta t^2 - \frac{\Delta t^3}{3!} \dot a(t)+ \mathcal{O}(\Delta t^4)
+    \label{eq:r_expansion}
+\end{split}
+\end{equation}
+
+ Summing the two previous equations:
+\begin{equation}
+    r(t+\Delta t) = 2r(t) + r(t-\Delta t) + a(t)\Delta t^2 + \mathcal{O}(\Delta t^4)
+    \label{eq:verlet_r_update}
+\end{equation}
+
+ The estimation of the new position is calculated with an error of the order of $\Delta t^4$ and contains the information of the previous two steps, thus making this algorithm highly correlated. Also, it's important to note that the algorithm does not use the velocity to compute the new position; however, it can be derived from the knowledge of the trajectory:
+\begin{equation*}
+    r(t+\Delta t) - r(t-\Delta t) = 2v(t)\Delta t  + \mathcal{O}(\Delta t^4)
+\end{equation*}
+ or
+\begin{equation}
+    v(t) = \frac{r(t+\Delta t) - r(t-\Delta t)}{2\Delta t}  + \mathcal{O}(\Delta t^2)
+    \label{eq:verlet_v_calc}
+\end{equation}
+
+Now that we have computed the new positions, we can discard the positions at $t-\Delta t$. The current positions become the old ones, and the new positions become the current positions, and we can move on to the next step. \\
+
+There exist several alternatives to the basic Verlet integration algorithm, including the Leapfrog algorithm and the Velocity-Verlet algorithm \cite{frenkel_smit}. In this work, we focus on the latter, as the Velocity-Verlet scheme is the default integration algorithm used in LAMMPS \cite{lammps_velocity_verlet}. Unlike the basic Verlet, it explicitly incorporates velocity updates at each step. This method preserves the advantages of the Verlet scheme (simplicity, time reversibility, and good energy conservation) while providing a direct evaluation of velocities, which is often required in molecular dynamics (computing kinetic energy, temperature, or applying thermostats). The Velocity-Verlet algorithm can be obtained as follows.\\
+
+
+We start from the position update in equation \eqref{eq:verlet_r_update} and the velocity calculation in equation \eqref{eq:verlet_v_calc} provided by the classical Verlet algorithm. But we want an update that advances $v$ consistently from $t$ to $t+\Delta t$, so expand $v$ and $a$ in time:
+\begin{equation*}
+\begin{split}
+v(t+\Delta t) &= v(t) + a(t)\,\Delta t + \tfrac{1}{2}\dot a(t)\,\Delta t^2 + \mathcal{O}(\Delta t^3) \\
+a(t+\Delta t) &= a(t) + \dot a(t)\,\Delta t + \mathcal{O}(\Delta t^2)
+\end{split}
+\end{equation*}
+Eliminate $\dot a(t)$ between the two previous equations:
+\[
+\tfrac{1}{2}\dot a(t)\,\Delta t^2 \;=\; \tfrac{1}{2}\big[a(t+\Delta t)-a(t)\big]\Delta t + \mathcal{O}(\Delta t^3).
+\]
+Substituting in velocity expansion yields the velocity update
+\begin{equation*}
+v(t+\Delta t) \;=\; v(t) + \tfrac{1}{2}\big[a(t)+a(t+\Delta t)\big]\Delta t + \mathcal{O}(\Delta t^3).
+\label{eq:vv-velocity}
+\end{equation*}
+
+Combining the $\mathcal{O}(\Delta t^2)$ position advance from \eqref{eq:r_expansion} (truncated at second order) with \eqref{eq:vv-velocity} gives the Velocity--Verlet algorithm:
+\begin{align}
+\text{(i)} \quad & r(t+\Delta t) = r(t) + v(t)\,\Delta t + \tfrac{1}{2}a(t)\,\Delta t^2 \label{eq:vv-pos}\\
+\text{(ii)}\quad & \text{Compute } a(t+\Delta t) = \frac{F\big(r(t+\Delta t)\big)}{m} \nonumber\\
+\text{(iii)}\quad & v(t+\Delta t) = v(t) + \tfrac{1}{2}\big[a(t)+a(t+\Delta t)\big]\Delta t \label{eq:vv-vel}
+\end{align}
+
+An equivalent ``half-step'' form underlines the staggered velocity update:
+\begin{align*}
+v\!\!\left(t+\tfrac{\Delta t}{2}\right) &= v(t) + \tfrac{1}{2}a(t)\,\Delta t \\
+r(t+\Delta t) &= r(t) + v\!\left(t+\tfrac{\Delta t}{2}\right)\Delta t \\
+v(t+\Delta t) &= v\!\left(t+\tfrac{\Delta t}{2}\right) + \tfrac{1}{2}a(t+\Delta t)\,\Delta t
+\end{align*}
+
+The positions are updated using the current velocities and forces, while the velocities are updated in two half-steps: first using the forces at time $t$, and then corrected with the forces at $t+\Delta t$. This half-step Velocity-Verlet formulation is the one implemented in LAMMPS, ensuring that positions and velocities remain synchronised in time, which makes the algorithm efficient and convenient for practical simulations.
+
+\section{LAMMPS}
+The Large-scale Atomic/Molecular Massively Parallel Simulator (LAMMPS) is an open-source software package used widely for molecular dynamics (MD) simulations. 
+It was originally developed in the mid-1990s under a 5-way cooperative research between Sandia National Laboratories and Lawrence Livermore National Laboratory and three companies (Cray, DuPont, and Bristol-Myers Squibb). The goal was to create a parallel molecular dynamics code capable of running on large supercomputers for modelling materials and biomolecules. Initially written in Fortran, LAMMPS was later rewritten in C++ to provide greater flexibility and ease of adding new functionality \cite{lammps_history}.
+Since its creation, LAMMPS has evolved into one of the most popular and flexible MD codes in the scientific community, supported by a large user base and continuous contributions from both academia and industry. Developers can contribute directly to the LAMMPS source code, customising it or adding new features and algorithms through a modular design. 
+
+\subsection{Parallelization and Performance}
+As said in the introduction, LAMMPS was designed with parallel scalability in mind, allowing efficient use of computational resources, ranging from a single processor on a laptop to massively parallel supercomputers with thousands of cores or even GPU accelerators. This scalability is possible thanks to the fact that the code uses a technique called domain decomposition or partitioning, where the simulation box is separated into non-overlapping subdomains which fill the box and each assigned to a processor.\\
+
+Based on the spatial distribution of the particles to be simulated, the simulation box can be divided in different ways, as shown in Figure \ref{fig:domain_decomp}. 
+
+When the particle density is roughly uniform, the subdomains comprise a regular grid and all subdomains are identical in size and shape, containing roughly the same number of atoms. Both orthogonal and triclinic boxes can deform continuously during a simulation, for example, when simulating the compression of a solid or the shearing of a liquid, in which case the processor subdomains also deform.
+
+For systems with non-uniform density, with the default partitioning, the number of particles per processor can be imbalanced. This reduces parallel efficiency, as the overall simulation rate is limited by the slowest processor, i.e. the one with the largest computational load. For such models, LAMMPS supports multiple strategies to reduce the load imbalance.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\textwidth]{photos/domain_decomp.png}
+    \caption{Three kinds of spatial decomposition (partitioning) of the simulation box for MPI parallelism \cite{lammps_balance}.}
+    \label{fig:domain_decomp}
+\end{figure}
+
+Next to spatial decomposition, LAMMPS uses other advanced algorithms to handle particle interactions in large systems. Neighbour lists that track the neighbours of each particle within a cutoff radius, allowing forces to be calculated only between particles that are actually close together. For long-range interactions, like Coulombic interactions, LAMMPS implements efficient methods based on parallel FFTs \cite{press2007numerical} or Ewald \cite{Ewald1921} and PPPM techniques \cite{hockney_eastwood_1988}, allowing systems with thousands or millions of particles to be handled without sacrificing accuracy. 
+
+
+\subsection{Input Style}
+One of the key features of LAMMPS is the ease of interaction with the executable. This is achieved primarily through input scripts, text files containing a sequence of commands.
+These commands, extensively described in the LAMMPS wiki, define the system (units, atom styles, force fields), the simulation configuration (neighbour lists, integration algorithms, corrections), and the desired outputs (thermodynamic quantities, dumps, calculations).
+The input style is command-driven and modular: each line corresponds to a specific task, and commands can be combined or extended via additional packages. This approach makes LAMMPS highly flexible and intuitive for scripting complex workflows. 
+
+Once executed, the input file is parsed line by line by the LAMMPS engine. Within the executable, the corresponding modules are activated and combined with the chosen parallelisation strategy. %For example, running the same script on a single core or across hundreds of processors does not require modifying the input file; LAMMPS automatically manages the distribution of data and calculations \GB{while leaving to the user the ability to define how the simulation box is to be divided among the processors}. Similarly, when GPU acceleration is enabled, computationally intensive tasks such as pairwise force calculations are offloaded to the GPU, maintaining the same input syntax \GB{though in the case of GPU acceleration is advisable to specify appropriately defined interaction potentials optimized to run on GPUs}. 
+This separation between the input description and the underlying architecture is one of the main reasons LAMMPS is widely adopted: it allows researchers to focus on the physics problem without having to worry about low-level implementation details.\\
+
+Beyond defining the system and computational resources, the input scripts allow precise control over the simulation dynamics. Users can select among a wide range of interatomic potentials, from simple pairwise potentials such as Lennard-Jones to more complex many-body models like Embedded Atom Method (EAM) or Tersoff \cite{Tersoff1986}, enabling simulations of metals, semiconductors, and hybrid systems. Additionally, integration schemes such as Velocity-Verlet or Leapfrog can be chosen, and thermostats or barostats (e.g., Nosé-Hoover \cite{Hoover1985} or Langevin \cite{Berne1970, Langevin1908}) applied to maintain target temperatures or pressures, corresponding to NVE, NVT, or NPT ensembles. \\
+
+The input file also governs the generation of output data and on-the-fly calculations. Thermodynamic quantities (temperature, energy, pressure) can be printed at specified intervals, while trajectories of particle positions, velocities, and forces can be dumped for post-processing. Users can further instruct LAMMPS to compute per-atom properties, stress tensors, radial distribution functions, or heat fluxes during the simulation. By integrating system definition, simulation control, and output specification within a single script, LAMMPS ensures flexibility, reproducibility, and ease of use for complex simulation workflows.
+
+
+\subsection{Extensions and Community}
+LAMMPS features a modular architecture that enables users to enhance its core functions through optional packages. These packages offer specialised features, including advanced interatomic potentials like MEAM \cite{baskes1992} and many-body potentials, as well as high-performance computing improvements such as GPU or OpenMP acceleration. 
+The open-source nature of LAMMPS has created an active community of developers and users. Contributions from both academic and industrial sectors continuously extend the code with new algorithms, interatomic potentials, and analysis tools. For example, the integration of machine-learning frameworks such as FLARE \cite{Vandermause2020} allows on-the-fly training of interatomic potentials, while platforms like OpenKIM \cite{openkim_lammps_tutorial} provide standardised tests and pre-defined potentials, facilitating reproducible and reliable simulations.\\
+
+Importantly, no contributed feature is incorporated into LAMMPS without proper documentation \cite{lammps_doc}. The manual includes a dedicated Programmer's Guide, which explains the structure of the source code and provides guidance on extending or modifying its functionality. 
+Additionally, users can benefit from forums \cite{LAMMPS_Forum_40}, mailing lists, and a comprehensive wiki, where shared examples, tutorials, and scripts are available, promoting collaboration, reproducibility, and knowledge exchange within the community. 
+Together, these characteristics make LAMMPS highly accessible and user-friendly, even for complex simulation tasks. 
+
+
+\section{LAMMPS Thermodynamic Calculations}
+
+Once a molecular dynamics simulation is initialised and the system evolves in time, LAMMPS provides access to a variety of microscopic data, such as atomic positions, velocities, and forces. Macroscopic thermodynamic quantities can then be computed from these microscopic variables, either instantaneously or as time averages, following the principles of statistical mechanics. These quantities are only calculated when explicitly requested, for example, through specific commands, fixes, or computes that require them. 
+
+
+\subsection{Temperature}
+In LAMMPS, the temperature is computed from the atomic velocities according to the equipartition theorem of classical statistical mechanics. 
+The theorem states that each quadratic degree of freedom contributes, on average, an energy of $\tfrac{1}{2}k_BT$ to the system. 
+For $N$ atoms in three dimensions, there are $3N$ translational degrees of freedom, leading to an average kinetic energy
+\begin{equation*}
+    \langle K \rangle = \frac{3}{2} N k_B T.
+\end{equation*}
+
+From this relation, the instantaneous temperature is defined through the kinetic energy of the system as
+\begin{equation}
+    T = \frac{2}{3 N_{\mathrm{dof}} k_B} \sum_{i=1}^N \frac{1}{2} m_i v_i^2 ,
+\end{equation}
+where $N_{\mathrm{dof}}$ is the number of active degrees of freedom, which may be smaller than $3N$ if constraints or fixed atoms are present. 
+LAMMPS automatically subtracts the degrees of freedom associated with constraints and rigid-body fixes when evaluating the temperature. 
+The instantaneous value of $T$ can be printed with \texttt{thermo\_style} by including the keyword \texttt{temp}, or accessed via a compute of type \texttt{compute temp}, which calculates the kinetic temperature of a specified group of atoms.
+
+It is worth stressing that this classical definition holds under the assumption of full equipartition. At sufficiently low temperatures, quantum effects may suppress certain vibrational contributions, leading to deviations from the classical prediction; such effects are not captured within the standard classical MD framework implemented in LAMMPS.
+
+\subsection{Pressure}
+The pressure in a molecular system can be derived from the virial theorem, which relates the average scalar product between positions and forces to the kinetic energy as
+\begin{equation*}
+\left\langle \sum_{i=1}^N \mathbf{r}_i \cdot \mathbf{F}_i \right\rangle = -2 \langle K \rangle
+\end{equation*}
+where $K$ is the total kinetic energy. For a cubic simulation box of volume $V$, one can combine this relation with the mechanical definition of pressure as momentum transfer at the boundaries to obtain
+\begin{equation*}
+P = \frac{1}{3V} \left( 2K + \sum_{i=1}^N \mathbf{r}_i \cdot \mathbf{F}_i \right).
+\end{equation*}
+Expressing the kinetic energy via the equipartition theorem, $K = \tfrac{3}{2}Nk_BT$, leads to the microscopic expression for the instantaneous pressure:
+\begin{equation}
+P = \frac{Nk_B T}{V} + \frac{1}{3V} \sum_{i=1}^N \mathbf{r}_i \cdot \mathbf{F}_i 
+\end{equation}
+The first term corresponds to the ideal gas contribution, while the second arises from interatomic interactions and vanishes for a non-interacting system, recovering the ideal gas law.  
+
+In LAMMPS, this virial expression is implemented internally and can be accessed through the command \texttt{compute pressure}
+ or the keyword \texttt{press} in the \texttt{thermo\_style} command, or more generally via the global thermodynamic quantities computed at each timestep. Pressure is thus obtained consistently with the force field in use, automatically accounting for pairwise, bonded, and long-range interactions, as well as any imposed constraints. 
+
+
+\subsection{Energy}
+The total energy of the system is given by the sum of kinetic and potential contributions:
+\begin{equation}
+E = KE + PE
+\end{equation}
+with
+\begin{equation}
+KE = \sum_{i=1}^N \frac{1}{2} m_i v_i^2
+\quad \quad
+PE = \sum_{i<j} U(r_{ij})
+\end{equation}
+
+Usually, the kinetic energy of each particle is computed as $\tfrac{1}{2} m v^2$, where $m$ and $v$ are the mass and velocity of the particle, respectively. But in reality, there are two different ways to compute the kinetic energy, both coherently integrated within LAMMPS. The one evaluated from the expression above is the so-called translational kinetic energy, tied to the velocity of all the particles in the system. In thermodynamic output, it is often calculated from the instantaneous temperature of the system using the equipartition theorem, which simply assigns $\tfrac{1}{2}k_BT$ of energy for each quadratic degree of freedom. For the default definition of temperature, these two approaches coincide. However, more precise temperature calculations can subtract non-thermal components of motion (e.g., center-of-mass drift, rotation of a rigid body) or include different sets of degrees of freedom, leading to slightly different reported values of kinetic energy from the two methods.\\
+
+The potential energy, on the other hand, is obtained from the interaction model specified for the system. Depending on the force field and the chosen interactions, the total $PE$ may include just the pairwise contributions $U(r_{ij})$, or include also more complicated terms as bond stretching, angle bending, torsional (dihedral), improper terms, as well as long-range interactions in reciprocal space (Ewald or PPPM) and additional energy terms introduced by hand. 
+Obviously, given the complexity of these latter potentials, it is easy to imagine that the calculation of the PE could have an influence on the total computational cost of the simulation.\\
+
+In molecular dynamics, $E$ provides information on the internal state of the system and is strictly conserved only in microcanonical ($NVE$) simulations with an ideal integrator. In practice, due to numerical errors, the total energy fluctuates around a mean value; monitoring its stability is a standard way to assess the quality of the integration scheme. In canonical ($NVT$) or isothermal–isobaric ($NPT$) simulations, $E$ is no longer conserved, but still provides useful insights: for instance, comparing average kinetic and potential energy contributions reveals how energy is partitioned between particle motion and interactions, and they reflect how the system couples to the thermostat or barostat.
+
+\subsection{Stress tensor}
+The stress tensor is crucial to understanding the link between atomistic forces and macroscopic mechanical quantities such as pressure, surface tension, and stress under deformation. In molecular simulations, it is usually defined through a virial expression that combines the kinetic contribution of particle momenta with the configurational part due to interatomic forces and can be seen as the tensor generalization of the same expression of pressure. The trace of this tensor is related to the thermodynamic pressure (via the virial theorem), while its off-diagonal elements quantify shear stresses and are central in the calculation of transport properties such as viscosity. 
+
+In LAMMPS, the global stress tensor is obtained through the \texttt{compute pressure} command, which evaluates the virial expression by combining the kinetic term from a chosen temperature compute and the configurational term from interatomic forces. At the microscopic level, local virial contributions are calculated with two different computes, \texttt{compute stress/atom} and \texttt{compute centroid/stress/atom}, both of which follow the following formula, where $a$ and $b$ take on values $x,y,z$ to generate the components of the tensor:
+\begin{equation}
+    S_{ab} = -mv_av_b - W_{ab}
+\end{equation}
+where the first term is a kinetic energy contribution per atom and the second term is the virial, for which the compute style determines the exact computation details. Then, since these values correspond to a per-atom virial with units of energy, they must be divided by an appropriate volume to obtain a local stress field.
+
+The first calculation method is \texttt{compute stress/atom}, where the tensor calculated for every atom is symmetric and consists of 6 components, represented as a 6-element vector in the sequence: $xx$, $yy$, $zz$, $xy$, $xz$, $yz$. In this scenario, the virial contribution is determined in the following manner:
+\begin{equation}
+\begin{split} 
+W_{ab} & = \frac{1}{2} \sum_{n = 1}^{N_p} (r_{1_a} F_{1_b} + r_{2_a} F_{2_b}) + \frac{1}{2} \sum_{n = 1}^{N_b} (r_{1_a} F_{1_b} + r_{2_a} F_{2_b})  \\
+& + \frac{1}{3} \sum_{n = 1}^{N_a} (r_{1_a} F_{1_b} + r_{2_a} F_{2_b} + r_{3_a} F_{3_b}) + \frac{1}{4} \sum_{n = 1}^{N_d} (r_{1_a} F_{1_b} + r_{2_a} F_{2_b} + r_{3_a} F_{3_b} + r_{4_a} F_{4_b}) \\
+& + \frac{1}{4} \sum_{n = 1}^{N_i} (r_{1_a} F_{1_b} + r_{2_a} F_{2_b} + r_{3_a} F_{3_b} + r_{4_a} F_{4_b}) + \mathrm{Kspace}(r_{i_a},F_{i_b}) + \sum_{n = 1}^{N_f} r_{i_a} F_{i_b}
+\end{split}
+\end{equation}
+The first term is a pairwise energy contribution where $n$ loops over the neighbours of each atom, $\textbf{r}_1$ and $\textbf{r}_2$ are the positions of the two atoms in the pairwise interaction, and $\textbf{F}_1$ and $\textbf{F}_1$ are the forces on the two atoms resulting from the pairwise interaction. The second term is a bond contribution of similar form for the $N_b$ bonds that the atom is part of. There are similar terms for the $N_a$ angle, $N_d$ dihedral, and $N_i$ improper interactions the atom is part of. There is also a term for the KSpace contribution from long-range Coulombic interactions, if defined. Finally, there is a term for the $N_f$ fixes (shake or rigid --Inserire links--) that apply internal constraint forces to the atom.
+
+In case of compute \texttt{centroid/stress/atom}, the tensor computed for each atom is asymmetric with 9 components and is stored as a 9-element vector, and the virial contribution is:
+\begin{equation}
+    \begin{split} W_{ab} & = \sum_{n = 1}^{N_p} r_{I0_a} F_{I_b} + \sum_{n = 1}^{N_b} r_{I0_a} F_{I_b} + \sum_{n = 1}^{N_a} r_{I0_a}  F_{I_b} + \sum_{n = 1}^{N_d} r_{I0_a} F_{I_b} + \sum_{n = 1}^{N_i} r_{I0_a} F_{I_b} \\
+& + \mathrm{Kspace}(r_{i_a},F_{i_b}) + \sum_{n = 1}^{N_f} r_{i_a} F_{i_b}\end{split}
+\end{equation}
+As for the other compute, the first, second, third, fourth and fifth terms are pairwise, bond, angle, dihedral and improper contributions, but instead of assigning the virial contribution equally to each atom, only the force $\textbf{F}_I$ acting on atom $I$ due to the interaction and the relative position $\textbf{r}_{I0}$ of the atom $I$ to the geometric center of the interacting atoms, i.e. centroid, is used. As the geometric center is different for each interaction, the $\textbf{r}_{I0}$ also differs. The sixth term, Kspace contribution, is computed identically to \texttt{compute stress/atom}. 
+
+Because of the two distinct methods for calculating the stress tensor, there are some variations in the results: while the total system virial remains the same as when using \texttt{compute stress/atom}, the \texttt{compute centroid/stress/atom} method is recognized for yielding more reliable heat flux values for angle, dihedrals, improper, and constraint force contributions when evaluated using \texttt{compute heat/flux}.
+
+
+\subsection{Heat Flux}
+In simulations, the microscopic heat flux quantifies the rate at which energy is transported through the system. LAMMPS provides an easy way to compute it via the command \texttt{compute heat/flux}, which takes the per-atom values of kinetic energy, potential energy, and the stress tensor as input and returns a three-dimensional vector. For a system of $N$ particles with pairwise interactions occupying a volume $V$, the heat flux is:
+
+\begin{equation}
+    \mathbf{J} = \frac{1}{V} \left[ \sum_{i=1}^N e_i \mathbf{v}_i - \sum_{i=1}^N  \mathbf{S}_{i} \mathbf{v}_i \right]
+\end{equation}
+in the first term $e_i = \tfrac{1}{2}m_i v_i^2 + u_i$ is the per-atom energy, where $u_i$ is a suitable partition of the potential energy among atoms, which can be complex to deal with. In the case of many-body or bonding potentials (e.g., Embedded Atom Model, Tersoff,...), the decomposition of the potential energy $PE$ into per-atom contributions $u_i$ is not unique. For simple pairwise interactions, each atom can be assigned half the interaction energy with all its neighbours, $u_i = \tfrac{1}{2}\sum_{j\neq i} U(r_{ij})$.
+However, for many-body potentials, the energy depends on the local environment of each atom and cannot be uniquely assigned to pairs. Several conventions exist for defining $u_i$, but they must be consistent with the forces, so that the energy partitioning exactly reproduces the total potential energy and forces used in the simulation. The second term involves the atomic stress tensor $\textbf{S}_i$. While the virial expression is straightforward for pairwise interactions, many-body potentials require additional terms, and the atomic stress must be computed using a force decomposition consistent with the potential.
+
+Even though the microscopic definitions of per-atom energy $u_i$ and stress $\textbf{S}_i$ are not unique, the macroscopic behaviour of the system remains invariant. This means that, while different conventions may lead to different microscopic partitions, any physically meaningful, system-wide observable calculated from these quantities converges to the same result in the thermodynamic limit.
+
+
+\subsection{Transport Properties}
+Transport properties characterise how a system responds to gradients in momentum, energy, or particle concentration. They provide a direct link between the microscopic motion of individual particles and macroscopic observables such as diffusion coefficients, viscosity, or thermal conductivity. By analysing these properties, it is possible to gain insight into the dynamic behaviour of a material and its ability to transport mass, momentum, and heat.
+
+In molecular dynamics simulations, transport coefficients are typically obtained from the temporal evolution of particle displacements or from the correlation of microscopic flows. For example, the self-diffusion coefficient D is related to the long-term behaviour of the mean squared displacement of particles via the Einstein relation:
+\begin{equation}
+D = \lim_{t \to \infty} \frac{1}{6t}\langle | \mathbf{r}_i(t) - \mathbf{r}_i(0) |^2 \rangle
+\end{equation}
+
+Viscosity $\eta$ and thermal conductivity $\kappa$ can be derived from the time autocorrelation functions of the stress tensor and heat flux, respectively, through the Green-Kubo relations:
+\begin{equation}
+\eta = \frac{V}{k_B T} \int_0^\infty \langle P_{\alpha\beta}(0) P_{\alpha\beta}(t) \rangle dt
+\end{equation}
+\begin{equation}
+\kappa = \frac{V}{k_B T^2} \int_0^\infty \langle \mathbf{J}(0) \cdot \mathbf{J}(t) \rangle dt
+\end{equation}
+where $P_{\alpha\beta}$ are the components of the stress tensor and $\mathbf{J}$ is the heat flux vector. These formulations show how macroscopic transport coefficients naturally emerge from the microscopic dynamics of particles and connect seamlessly with the previously introduced concepts of energy and stress at the atomic scale.\\
+
+In LAMMPS, transport coefficients are not computed directly by built-in commands. Instead, as seen previously, the code provides access to the microscopic quantities required in their evaluation. These values can then be processed, either during the simulation or in post-processing, to extract transport coefficients through Einstein relations or Green–Kubo integrals. Furthermore, the official documentation and the LAMMPS wiki provide detailed tutorials and example scripts illustrating how to compute these properties in practice.
+
+
+\section{Autocorrelation Functions and the Green–Kubo Formalism}
+
+Heat transport at the macroscopic scale is a fundamental phenomenon in condensed matter, playing a key role in applications such as sensors and nanoelectronic devices, and understanding it is essential for the design of efficient nanosystems. Whenever a temperature gradient $\mathbf{\nabla} T(\mathbf{R})$ is present, a heat flux $\mathbf{J}(\mathbf{R})$ spontaneously develops to move the system back toward thermodynamic equilibrium. The temperature and pressure dependent thermal conductivity $\kappa(T, P)$ of the material describes the proportionality between heat flux and temperature gradient, in what is called Fourier’s law \cite{Wang2008HeatConduction}: 
+\begin{equation}
+\mathbf{J}(\mathbf{R})= -\kappa(T, P) \cdot \mathbf{\nabla} T(\mathbf{R})
+\end{equation}
+
+However, nonequilibrium approaches require us to impose an artificial temperature gradient, which can become unreasonably large ( $> 10^9 K/cm$ \cite{tenenbaum1982}) due to the limited system sizes accessible in molecular dynamics simulations. Especially at high temperatures, this can lead to non-linear artefacts \cite{kovács2019} that prevent the evaluation of the linear response regime described by Fourier’s law.\\
+
+The evaluation of thermal conductivity in condensed matter systems can be approached through other theoretical and computational ways. Among them, the Green–Kubo (GK) formalism, rooted in linear response theory, has established itself as a standard and widely adopted method. Originally introduced by Kubo in the context of nonequilibrium statistical mechanics \cite{kubo1957statistical}, the formalism links macroscopic transport coefficients to time integrals of microscopic current autocorrelation functions via the fluctuation–dissipation theorem. This connection provides a rigorous theoretical foundation: transport properties such as viscosity, diffusivity, and thermal conductivity can be computed from equilibrium molecular dynamics simulations without the need to impose external gradients.
+
+In this thesis, the Green–Kubo formalism is utilised to assess the phononic contribution to the thermal conductivity of metallic nanofoams. Although the electronic transport in these systems has been thoroughly investigated, the nuclear contribution to heat transport is still relatively less studied. The GK method presents a robust and computationally accessible framework for measuring this contribution, thereby enhancing the current understanding of electronic conduction and providing a more comprehensive view of thermal transport in nanoscale porous metals.
+
+\subsection{Memory and Autocorrelation Functions}
+Before discussing the GK formalism, it's important to reflect on what we mean by memory in complex systems. It stands for the ability of past events to act as an influence on future dynamics, which extends in time in a scale-invariant fashion. In statistical mechanics, this notion is rigorously quantified through time autocorrelation functions, which measure how fluctuations of a given observable at one time are related to fluctuations of the same observable at a later time \cite{frenkel_smit,  BerneForster1971, Zwanzig1965}. \\
+
+
+Given the covariance between two random processes, $x_i(t)$ and $x_j(t)$, is defined as: 
+\begin{equation}
+\text{cov}_{[x_i,x_j]}(t_1,t_2) = \langle x_i(t_1) x_j(t_2)\rangle- \langle x_i(t_1) \rangle \langle x_j(t_2) \rangle
+\end{equation}
+The autocorrelation function of a stationary random process $x(t)$ is the statistical covariance of the process with a time-delayed copy of itself. It is defined, for any time lag $\tau > 0$, as
+\begin{equation}
+Ac_{[x]}(\tau) = \frac{\text{cov}_{[x_i,x_j]}(t,t+\tau)}{\sqrt{\text{cov}_{[x_i,x_j]}(t,t)} \sqrt{\text{cov}_{[x_i,x_j]}(t+\tau,t+\tau)}} = \frac{\text{cov}_{[x_i,x_j]}(t,t+\tau)}{\sigma^2_x}
+\end{equation}
+
+where the denominator reduces to the variance of the process at time t. In the case of a stationary process, statistical properties do not depend on the absolute time $t$ but only on the lag $\tau$, which ensures that $Ac_{[x]}(\tau)$ depends solely on the delay and not on the choice of origin. \\
+
+As said previously, the autocorrelation is useful to investigate the presence of memory
+or, more precisely, statistical dependence in a process because it inherits from the covariance the following properties:
+\begin{itemize}
+    \item If $Ac_{[x]}(\tau)=0$ for all $\tau > 0$, it means that all the values of the process are independent of each other. That is, the process lacks any kind of memory.
+    \item If $Ac_{[x]}(\tau)=0$ for $\tau$ > $\tau_c$, it implies that the process becomes independent of its past history only after a lapse of time $\tau_c$, or that the process has no memory about itself beyond a lapse $\tau_c$, that provides a characteristic memory timescale.
+    \item If $Ac_{[x]}(\tau)\approx \tau^{-a},\ \ a > 0,\ \ \tau \gg 0$, one might suspect that memory remains present in the system for all times in a self-similar manner, as made apparent by the power-law dependence, thus lacking any memory timescale.
+\end{itemize}
+In practice, things are never this clear-cut. For instance, the autocorrelation is almost never exactly zero. Therefore, one has to decide which threshold value is a reasonable one, below which one can safely consider the autocorrelation as negligible.\\
+
+Transport properties, such as viscosity or thermal conductivity, are directly connected to these memory kernels: the rate at which correlations vanish determines the efficiency with which momentum or energy is transferred across the system. This formalism naturally sets the stage for the Green–Kubo relations, where transport coefficients are expressed as time integrals of the corresponding autocorrelation functions.
+
+
+\subsection{Equilibrium MD} \label{subsec:EMD}
+The Green–Kubo (GK) formalism provides a reliable method for calculating transport coefficients in molecular dynamics, but its application is restricted to systems that meet specific conditions \cite{Tuckerman2010}. 
+
+The first and crucial condition is the linearity of the response. The Green–Kubo formalism is derived within the framework of linear response theory, which assumes that the system’s reaction to an external perturbation is directly proportional to the strength of that perturbation. Based on this hypothesis, it can be deduced that transport coefficients serve as proportionality constants that connect macroscopic fluxes to small perturbations. This indicates that the microscopic fluctuations observed in equilibrium must stay within the linear response regime; if they do not, the integration of the correlation function may not yield the correct transport coefficient.
+
+From what has been said so far, it is simple to assume that one of the system's prerequisites is that it must be in thermodynamic equilibrium. This means that intensive quantities like temperature, pressure, and chemical composition must be uniformly distributed throughout the system, and the simulation cell should not experience any external forces. Typically, this criterion is met through the application of periodic boundary conditions, which help eliminate surface effects that can be challenging to treat, allowing the system to emulate bulk behaviour. 
+
+Thermodynamic equilibrium must also be complemented by the assumption of homogeneity and isotropy. This condition guarantees that the correlation functions of microscopic fluxes can be directly related to well-defined macroscopic transport coefficients. However, the Green–Kubo relations remain formally valid even in heterogeneous or anisotropic systems (interfaces, confined fluids, or nanostructured solids) since they are derived from general principles of linear response theory. What changes is the interpretation: the resulting coefficients may depend on spatial location, structural features, or direction, and thus require a more careful analysis. 
+
+%In the present work, this assumption will be pushed to its extreme, applying the GK formalism to systems that deviate significantly from bulk homogeneity, to assess both its applicability and its limitations in complex nanostructured materials.
+
+Lastly, the microscopic fluctuations must be time-stationary. The ensemble average of fluxes should not exhibit systematic drift but should instead fluctuate around a stable mean value. This stationarity is critical for ensuring that time-correlation functions converge to finite values over the long term. Non-stationarity, which may occur due to inadequate equilibration or finite-size effects, can produce misleading divergences or unreliable transport coefficients.\\
+
+When any of these conditions break down—such as under strong shear, large gradients, or far-from-equilibrium regimes—the formalism is no longer valid, and one must resort instead to nonequilibrium molecular dynamics (NEMD) methods to extract transport coefficients from a driven steady state. In this sense, the linearity condition defines not only the conceptual basis of the Green–Kubo approach but also its practical domain of applicability.
+
+
+\subsection{G-K formula for thermal conductivity}
+
+In this thesis, the Green–Kubo framework will be applied to calculate the thermal conductivity of the systems under investigation, with a special focus on nanostructured and porous materials. These are precisely the cases where nonequilibrium approaches may encounter some difficulties, for instance, the local Fourier relationship between heat flux density $\mathbf{J}$ and temperature gradient $\mathbf{\nabla}T$ can no longer be valid in its simple form \cite{Allen2014}. In doing so, we will also push the assumptions underlying the method, like homogeneity and isotropy, to their limits, to explore the extent to which equilibrium-based statistical mechanics can still provide meaningful insight into nanoscale heat transport.\\
+
+The Green–Kubo relationship defines the thermal conductivity along the direction of the heat flux $u=x,y,z$ as the time integral of the heat flux autocorrelation function (HFACF):
+\begin{equation}
+    \kappa_u  = \frac{V}{k_B T^2} \int_0^\infty \langle J_u(0)  J_u(t) \rangle \, \mathrm{d} t 
+\end{equation}
+In practical terms, this involves calculating the microscopic heat flux vector at each timestep during an equilibrium simulation and determining its time correlation function, which reveals how effectively energy is transported throughout the system. This approach is particularly advantageous because it eliminates the necessity for externally applied temperature gradients or fluxes: the relevant information is found in the fluctuations of the equilibrium trajectories. \\
+
+If the system is spatially isotropic, we can define the thermal conductivity as the average of the three cardinal directions as follows:
+\begin{align}
+    \kappa &= \frac 1 3 \sum_{u=x,y,z} k_u \nonumber\\
+    &= \frac 1 3 \sum_{u=x,y,z}\frac{V}{k_B T^2} \int_0^\infty \langle J_u(0)  J_u(t) \rangle \, \mathrm{d} t \nonumber\\ 
+    &= \frac{V}{3k_B T^2} \int_0^\infty \sum_{u=x,y,z}\langle J_u(0)  J_u(t) \rangle \, \mathrm{d} t\nonumber \\
+    &=\frac{V}{3 k_B T^2} \int_0^\infty \langle \mathbf{J}(0) \cdot  \mathbf{J}(t)  \rangle \, \mathrm{d}t
+\end{align}
+
+Thus, once the heat-flux autocorrelation function is properly sampled, the time integral is expected to converge to a well-defined plateau, from which the thermal conductivity can be evaluated. The quality of the result ultimately reflects the decay behaviour of the correlations and the statistical accuracy of the sampling, providing a consistent way to determine $\kappa$ within the Green–Kubo framework.
