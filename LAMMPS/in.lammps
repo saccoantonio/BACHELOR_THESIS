@@ -1,0 +1,236 @@
+# ===============================================================
+# Thermal conductivity of Au with vacancies - Full workflow
+# NVT equilibration → NVE equilibration → Green-Kubo production
+# ===============================================================
+
+# ------------------------------
+# Global simulation settings
+# ------------------------------
+
+units           metal              # Use metal units (ps, eV, Å, K, bar)
+dimension       3                  # 3D simulation
+boundary        p p p              # Periodic boundary conditions in all directions
+atom_style      atomic             # Atomic system (no bonds)
+
+# Neighbor list construction
+neighbor        1.0 bin             # Neighbor skin distance (Å)
+neigh_modify    delay 5 check yes   # Rebuild neighbor list every 5 steps if needed
+
+# Random seed for velocity initialization
+variable        seed equal 12345
+
+# ------------------------------
+# Initial configuration
+# ------------------------------
+
+# Read atomic configuration with voids/vacancies
+read_data       "..."
+
+# Atomic mass (Au)
+mass            1   196.96657       # Gold atomic mass (amu)
+
+# Interatomic potential
+pair_style      eam                # Embedded Atom Method
+pair_coeff      * * ".../Au_u3.eam"
+
+# Initialize velocities at 300 K
+# - mom yes: remove total linear momentum
+# - rot yes: remove total angular momentum
+velocity        all create 300 ${seed} mom yes rot yes dist gaussian
+
+# ===============================================================
+# Stage 1: NVT Equilibration
+# ===============================================================
+
+# ------------------------------
+# Thermodynamic variables
+# ------------------------------
+
+variable        T equal temp        # Instantaneous temperature
+variable        KE equal ke          # Total kinetic energy
+variable        PE equal pe          # Total potential energy
+variable        Etot equal etotal    # Total energy
+variable        P equal press        # Pressure
+variable        V equal vol          # Volume
+
+# Time averaging of thermodynamic quantities
+fix             ave1 all ave/time 100 1 100 v_T v_KE v_PE v_Etot v_P v_V file therm.dat format "%20.10e"
+
+# Dump atomic positions and velocities during equilibration
+dump            dumptherm all custom 5000 therm.dump id x y z vx vy vz 
+
+# Nose–Hoover thermostat for NVT ensemble
+# Tdamp = 0.5 ps
+fix             fx_nvt all nvt temp 300 300 0.5
+
+# Thermodynamic output
+thermo          100000
+thermo_style    custom step temp pe ke etotal press vol
+
+# Run NVT equilibration (1 ns)
+run             1000000
+
+# Cleanup NVT stage
+unfix           fx_nvt
+unfix           ave1
+undump          dumptherm
+
+# Save equilibrated configuration
+write_restart   restart.therm
+
+# ===============================================================
+# Stage 2: NVE equilibration after restart
+# ===============================================================
+
+# ------------------------------
+# Reset simulation state
+# ------------------------------
+
+clear                               # Clear simulation
+units           metal
+dimension       3
+boundary        p p p
+atom_style      atomic
+neighbor        1.0 bin
+neigh_modify    delay 5 check yes
+
+# Read equilibrated NVT restart
+read_restart    restart.therm
+
+# Re-define interatomic potential
+pair_style      eam
+pair_coeff      * * ".../Au_u3.eam"
+
+# Dump configuration immediately after restart
+dump restart_nvt all custom 1 config_restart_nvt.dump id type x y z vx vy vz
+run 1
+undump restart_nvt
+
+# Reset timestep counter
+reset_timestep  0
+
+# ------------------------------
+# Short NVE equilibration
+# ------------------------------
+
+# Define thermodynamic variables again
+variable        T equal temp
+variable        KE equal ke
+variable        PE equal pe
+variable        Etot equal etotal
+variable        P equal press
+variable        V equal vol
+
+# Time-averaged thermodynamic output
+fix             ave1 all ave/time 100 1 100 v_T v_KE v_PE v_Etot v_P v_V file eq.dat format "%20.10e"
+
+# Dump during NVE equilibration
+dump            dumpeq all custom 5000 eq.dump id x y z vx vy vz 
+
+# NVE ensemble (energy-conserving dynamics)
+fix             fx_nve all nve
+
+thermo          100000
+thermo_style    custom step temp pe ke etotal press vol
+
+# Run NVE equilibration (1 ns)
+run             1000000
+
+# Cleanup
+unfix           fx_nve
+unfix           ave1
+undump          dumpeq
+
+# Save equilibrated NVE configuration
+write_restart   restart.eq
+
+# ===============================================================
+# Stage 3: Production run for Green–Kubo
+# ===============================================================
+
+# ------------------------------
+# Reset simulation again
+# ------------------------------
+
+clear
+units           metal
+dimension       3
+boundary        p p p
+atom_style      atomic
+neighbor        1.0 bin
+neigh_modify    delay 5 check yes
+
+# Read NVE-equilibrated restart
+read_restart    restart.eq
+
+# Re-define potential
+pair_style      eam
+pair_coeff      * * ".../Au_u3.eam"
+
+# Dump configuration after restart
+dump restart_nve all custom 1 config_restart_nve.dump id type x y z vx vy vz
+run 1
+undump restart_nve
+
+# Reset timestep for correlation functions
+reset_timestep  0
+
+# ------------------------------
+# Heat flux computation (Green–Kubo)
+# ------------------------------
+
+# Per-atom kinetic energy
+compute         myKE all ke/atom
+
+# Per-atom potential energy
+compute         myPE all pe/atom
+
+# Per-atom stress tensor (virial contribution only)
+compute         myStress all stress/atom NULL virial
+
+# Total heat flux vector
+compute         flux all heat/flux myKE myPE myStress
+
+# Components of the heat flux
+variable        Jx equal c_flux[1]
+variable        Jy equal c_flux[2]
+variable        Jz equal c_flux[3]
+
+# Thermodynamic variables
+variable        T equal temp
+variable        KE equal ke
+variable        PE equal pe
+variable        Etot equal etotal
+variable        P equal press
+variable        V equal vol
+
+# Dump atomic trajectories during production
+dump            dump1 all custom 5000 kappa.dump id x y z vx vy vz 
+
+# Time-averaged output including heat flux
+fix             ave1 all ave/time 10 1 10 v_T v_KE v_PE v_Etot v_P v_V v_Jx v_Jy v_Jz file kappa.dat format "%20.10e"
+
+# NVE production run
+fix             prod all nve
+
+thermo          100000
+thermo_style    custom step temp ke pe etotal press vol
+
+# Periodic restart files (safety for long runs)
+restart         10000000 restart_*
+
+# Long production run (100 ns)
+run             100000000
+
+# Cleanup
+unfix           prod
+unfix           ave1
+undump          dump1
+
+# Save final state
+write_restart   restart.kappa
+
+# Dump final configuration
+dump restart_nve all custom 1 config_restart_nve_prod.dump id type x y z vx vy vz
+run 1
+undump restart_nve
